@@ -156,6 +156,57 @@ class SyncIntegrityTests(unittest.TestCase):
         self.assertEqual(updated['failedSourceDetails'][0]['code'], 'NETWORK')
         self.assertEqual(updated['failedCourses'], [])
 
+    def test_duplicate_course_names_do_not_clear_unrelated_failures(self):
+        first = {'courseType': 'ai', 'courseId': 70, 'classId': 4, 'name': '同名课程'}
+        second = {'courseType': 'ai', 'courseId': 71, 'classId': 4, 'name': '同名课程'}
+        app.update_cache(app.COURSES, lambda _: {'courses': [first, second]}, self.fp)
+        app.update_cache(app.PROGRESS, lambda _: {
+            'courses': [{**first, 'stale': True}, {**second, 'stale': True}],
+            'incomplete': True,
+            'failedCourses': ['同名课程', '同名课程'],
+            'failedCourseKeys': [app.progress_key(first), app.progress_key(second)],
+            'failedCourseDetails': [{'code': 'TIMEOUT'}, {'code': 'NETWORK'}],
+        }, self.fp)
+        session = FakeSession()
+        with (
+            patch.object(app.os, 'chdir'),
+            patch.object(app, 'load_config_and_session', return_value=(object(), session)),
+            patch.object(app, 'AiCourseManager', return_value=object()),
+            patch.object(app, 'ai_progress', return_value={**first, 'stale': False}),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(app.verify_one('ai', '70', '4'), 0)
+        progress = app.read_cache(app.PROGRESS)
+        self.assertTrue(progress['incomplete'])
+        self.assertEqual(progress['failedCourses'], ['同名课程'])
+        self.assertEqual(progress['failedCourseKeys'], [app.progress_key(second)])
+        self.assertEqual(progress['failedCourseDetails'], [{'code': 'NETWORK'}])
+        self.assertTrue(next(c for c in progress['courses'] if c['courseId'] == 71)['stale'])
+        self.assertTrue(session.closed)
+
+    def test_legacy_duplicate_course_names_remain_unconfirmed(self):
+        first = {'courseType': 'ai', 'courseId': 70, 'classId': 4, 'name': '同名课程'}
+        second = {'courseType': 'ai', 'courseId': 71, 'classId': 4, 'name': '同名课程'}
+        app.update_cache(app.COURSES, lambda _: {'courses': [first, second]}, self.fp)
+        app.update_cache(app.PROGRESS, lambda _: {
+            'courses': [{**first, 'stale': True}, {**second, 'stale': True}],
+            'incomplete': True,
+            'failedCourses': ['同名课程', '同名课程'],
+        }, self.fp)
+        session = FakeSession()
+        with (
+            patch.object(app.os, 'chdir'),
+            patch.object(app, 'load_config_and_session', return_value=(object(), session)),
+            patch.object(app, 'AiCourseManager', return_value=object()),
+            patch.object(app, 'ai_progress', return_value={**first, 'stale': False}),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertEqual(app.verify_one('ai', '70', '4'), 0)
+        progress = app.read_cache(app.PROGRESS)
+        self.assertTrue(progress['incomplete'])
+        self.assertEqual(progress['failedCourses'], ['同名课程', '同名课程'])
+        self.assertTrue(session.closed)
+
     def test_verify_bootstrap_exception_is_redacted_and_leaves_cache_untouched(self):
         course = {'courseType': 'ai', 'courseId': 70, 'classId': 4, 'name': 'Examined'}
         app.update_cache(app.COURSES, lambda _: {'courses': [course]}, self.fp)
