@@ -251,6 +251,29 @@ def read_with_retry(operation, *, sleep=time.sleep):
     raise AssertionError("unreachable")
 
 
+def local_login_file_state() -> str:
+    """Only validate the ZHS cookie-file envelope; never infer server login from it.
+
+    Matches the upstream read_cookies_file/list_to_cookies format. No cookie
+    contents, identifiers or path details are included in diagnostic output.
+    """
+    try:
+        with (DATA / "cookies.json").open("r", encoding="utf-8") as handle:
+            rows = json.load(handle)
+    except FileNotFoundError:
+        return "missing"
+    except (OSError, UnicodeError, ValueError):
+        return "invalid"
+    if (not isinstance(rows, list) or not rows
+            or any(not isinstance(row, dict)
+                   or not isinstance(row.get("name"), str)
+                   or not row["name"]
+                   or not isinstance(row.get("value"), str)
+                   for row in rows)):
+        return "invalid"
+    return "present"
+
+
 def doctor_server() -> int:
     """Verify read-only platform endpoints, not just local cookie parsing.
 
@@ -259,17 +282,24 @@ def doctor_server() -> int:
     Return 0=both read endpoints confirmed, 7=partial, 6=neither,
     3=no credential, 4=no local SDK session, 5=unexpected bootstrap failure.
     """
-    if not (DATA / "cookies.json").is_file():
+    state = local_login_file_state()
+    if state == "missing":
         print("[AUTH] 未找到扫码凭证，请先登录。")
         return 3
+    if state == "invalid":
+        print("[AUTH_LOCAL_INVALID] 本地登录凭证格式无效；未联系服务器，建议重新扫码登录。")
+        return 4
     os.chdir(Path.home())
     session = None
     try:
         loaded = load_config_and_session(debug=False, console_log=False, proxy=None)
         if loaded is None:
-            print("[AUTH_OR_NETWORK] 无法初始化本机会话，服务器读取尚未确认。")
+            print("[AUTH_OR_NETWORK] 凭证存在但服务端登录校验未通过或暂时不可用；先检查网络，不要直接删除凭证。")
             return 4
         _, session = loaded
+        # Upstream ZHS bootstrap has already verified getLoginUserInfo.
+        # Business API failures must NOT be reclassified as login expiration.
+        print("[SESSION_OK] 服务端登录校验通过；正在分别检测课程读取接口。")
         confirmed = []
         failed = []
         for name, read in (
