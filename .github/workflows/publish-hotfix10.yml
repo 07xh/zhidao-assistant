@@ -1,0 +1,126 @@
+name: Publish Zhidao Assistant v5.2.8 Hotfix10 (pre-release)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-hotfix10.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-v5.2.8-hotfix10
+  cancel-in-progress: false
+
+jobs:
+  test-build-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: 'payload:research:.'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.2'
+
+      - name: Install Python test dependencies
+        run: python -m pip install 'httpx==0.28.1'
+
+      - name: Python regression suite
+        run: |
+          python -m unittest discover -v -p 'test_*.py'
+          python -m unittest -v research.test_heartbeat_lab
+
+      - name: JavaScript media-controller tests
+        run: node test_media_controller.cjs
+
+      - name: Windows payload and encoding checks
+        run: |
+          python test_stability.py
+          python test_cmd_encoding.py
+          python test_ps1_encoding.py
+          python test_lifecycle_v528.py
+
+      - name: Cross-compile Windows x64 installer
+        run: python build.py
+
+      - name: Verify output and create SHA-256 checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXE="ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe"
+          test -s "$EXE"
+          file "$EXE"
+          file "$EXE" | grep -q 'PE32'
+          sha256sum "$EXE" > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Upload installer as CI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZhidaoAssistant-v5.2.8-hotfix10-windows-x64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe
+            SHA256SUMS.txt
+
+      - name: Prepare release notes
+        shell: bash
+        run: |
+          cat > RELEASE-NOTES.txt <<'EOF'
+          Zhidao Assistant v5.2.8 Hotfix10 — Windows x64 pre-release
+
+          Includes Hotfix9 functionality plus corrected login-detection states:
+          automatic post-QR read-only diagnosis, malformed-cookie preflight,
+          and separate verified-login versus failed course-endpoint status.
+          Does not modify ZHS video heartbeat or platform progress writing.
+
+          Important:
+          - This is a TEST RELEASE, not a stable release.
+          - CI verifies offline regression tests and cross-compiles the installer.
+          - Windows 10/11 GUI/installation and live course-server behavior have
+            NOT yet been validated on a real Windows computer.
+          - No guarantee that platform progress or heartbeat records are updated.
+          - The executable is not code-signed. Confirm its SHA-256 from SHA256SUMS.txt.
+          - Back up %USERPROFILE%\\.zhs and %LOCALAPPDATA%\\ZHSDesktop before upgrading.
+          - Do not upload cookies, access tokens or private request logs.
+
+          License: GPL-3.0-only. Source is available at the matching GitHub tag.
+          EOF
+
+      - name: Create GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v5.2.8-hotfix10"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release already exists; leaving existing immutable release untouched."
+          else
+            gh release create "$TAG" \
+              "ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe" \
+              "SHA256SUMS.txt" \
+              --target "$GITHUB_SHA" \
+              --title "Zhidao Assistant v5.2.8 Hotfix10 (Windows x64 test release)" \
+              --notes-file RELEASE-NOTES.txt \
+              --prerelease
+          fi
