@@ -37,20 +37,30 @@ jobs:
           go-version: '1.23.2'
       - name: Install test dependencies
         run: python -m pip install 'httpx==0.28.1'
-      - name: Run regression suite
+      - name: Run Python and JavaScript regression suites
         run: |
           python -m unittest discover -v -p 'test_*.py'
           python -m unittest -v research.test_heartbeat_lab
           node test_media_controller.cjs
-          python test_stability.py
-          python test_cmd_encoding.py
-          python test_ps1_encoding.py
-          python test_lifecycle_v528.py
-      - name: Cross-compile installer and inspect PE header
+          python -m compileall -q payload build.py
+      - name: Cross-compile and checksum unreleased Windows installer
         run: |
+          set -euo pipefail
           python build.py
-          file ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe
-          file ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe | grep -q PE32
+          EXE="ZhidaoAssistant-Setup-v5.2.8-dev.exe"
+          file "$EXE"
+          file "$EXE" | grep -q PE32
+          sha256sum "$EXE" > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+      - name: Save tested development installer (not a GitHub Release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZhidaoAssistant-v5.2.8-dev-windows-x64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            ZhidaoAssistant-Setup-v5.2.8-dev.exe
+            SHA256SUMS.txt
 
   windows-syntax:
     name: Windows PowerShell 5.1 source parse
