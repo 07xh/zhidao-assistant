@@ -151,6 +151,7 @@ function Update-LoginState {
         'partial' { '服务端登录已验证 · 部分课程接口异常' + $time }
         'course-failed' { '服务端登录已验证 · 课程接口均异常' + $time }
         'session-unconfirmed' { '登录尚未确认 · 网络异常或凭证失效均有可能' }
+        'local-invalid' { '登录凭证文件无效 · 需要重新扫码' }
         'environment-error' { '登录检测未完成 · 检查运行环境' }
         default { '存在本地凭证 · 尚未验证服务器登录' }
     }
@@ -214,6 +215,7 @@ function Check-TaskExit {
                 7 { 'partial' }
                 6 { 'course-failed' }
                 4 { 'session-unconfirmed' }
+                8 { 'local-invalid' }
                 5 { 'environment-error' }
                 default { '' }
             }
@@ -221,7 +223,8 @@ function Check-TaskExit {
             (Control 'SyncMessageText').Text = switch ($code) {
                 0 { '服务器只读检测通过：共享课和智慧课程接口均已返回有效数据。可以同步课程。' }
                 3 { '连接诊断：本机缺少扫码凭证。请先扫码登录。' }
-                4 { '连接诊断：凭证格式异常，或服务器登录尚未确认。请先检查网络，必要时重新扫码。' }
+                4 { '连接诊断：本地凭证存在，但服务器登录校验尚未通过；检查网络，必要时重新扫码。' }
+                8 { '连接诊断：本地 Cookie 文件格式无效，尚未连接服务器；请重新扫码登录。' }
                 5 { '连接诊断：服务器测试未完成。请检查本机运行环境。' }
                 6 { '连接诊断：服务端登录已验证，但两类课程接口都失败。请查看命令窗口的安全错误代码。' }
                 7 { '连接诊断：部分课程接口成功、部分失败。可以查看已获取的课程，但仍需修复失败来源。' }
