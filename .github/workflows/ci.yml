@@ -85,3 +85,6 @@ jobs:
             }
             Write-Host "Parsed $($_.Name)"
           }
+      - name: Test login state module with fake local cookies
+        shell: powershell
+        run: .\\test_session_state.ps1
