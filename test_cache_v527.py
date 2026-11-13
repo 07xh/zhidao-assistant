@@ -18,6 +18,11 @@ sys.modules['zhs.cli.bootstrap'].load_config_and_session = lambda **_: None
 sys.modules['zhs.zhidao.course'].ZhidaoCourseManager = object
 sys.modules['zhs.zhidao.models'].extract_course_id = lambda x: x.course_id
 sys.modules['zhs.ai.course'].AiCourseManager = object
+# Direct-file test imports must resolve the adapter's bundled sibling modules,
+# even when PYTHONPATH is not set by a developer shell.
+payload_dir = str(Path(__file__).parent / 'payload')
+if payload_dir not in sys.path:
+    sys.path.insert(0, payload_dir)
 spec = importlib.util.spec_from_file_location('zhidao_only_test', Path(__file__).parent/'payload/zhidao_only.py')
 app = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(app)
