@@ -1,10 +1,12 @@
 [
   "ZhidaoAssistant.exe",
   "Zhidao-GUI.ps1",
+  "SessionState.ps1",
   "Zhidao-UI.xaml",
   "Consent-UI.xaml",
   "Zhidao-Task.cmd",
   "zhidao_only.py",
+  "zhidao_diagnostics.py",
   "Uninstall.ps1",
   "使用条款与第三方声明.txt",
   "隐私政策与数据说明.txt",
