@@ -9,7 +9,7 @@ $root = Join-Path $env:LOCALAPPDATA 'ZHSDesktop'
 $venv = Join-Path $root '.venv'
 $uv = Join-Path $root 'uv.exe'
 $zhs = Join-Path $venv 'Scripts\zhs.exe'
-Write-Host '== Zhidao Assistant V5.2.8 Hotfix9 ZHS Reliability Installer ==' -ForegroundColor Cyan
+Write-Host '== Zhidao Assistant V5.2.8 Hotfix10 Login Diagnostics Installer ==' -ForegroundColor Cyan
 Write-Host 'Uses official pjm314159/zhs version 0.1.5; reads Zhidao shared courses and AI smart courses.'
 if (-not [Environment]::Is64BitOperatingSystem) { throw 'Windows 10/11 x64 is required.' }
 New-Item -ItemType Directory -Path $root -Force | Out-Null
