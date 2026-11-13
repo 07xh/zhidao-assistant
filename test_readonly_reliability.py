@@ -106,7 +106,7 @@ class ReadReliabilityTests(unittest.TestCase):
                  patch.object(app, 'load_config_and_session') as loader:
                 (Path(d) / 'cookies.json').write_text(content)
                 with contextlib.redirect_stdout(io.StringIO()) as output:
-                    self.assertEqual(app.doctor_server(), 4)
+                    self.assertEqual(app.doctor_server(), 8)
                 loader.assert_not_called()
                 self.assertIn('[AUTH_LOCAL_INVALID]', output.getvalue())
 
