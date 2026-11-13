@@ -42,6 +42,9 @@ $script:pendingVerifyCourse = $null
 $script:pendingVerifyPath = Join-Path $script:root 'pending-verify.json'
 $script:verifyOutputPath = $null
 $script:verifyErrorPath = $null
+$script:loginProbeState = ''
+$script:loginProbeCookieDigest = ''
+$script:loginProbeCheckedAt = $null
 
 
 function Load-Xaml([string]$path) {
@@ -113,6 +116,45 @@ function Any-TaskActive {
     $script:runningTasks = @($alive)
     return ($script:runningTasks.Count -gt 0)
 }
+function Get-CookieDigest {
+    # Ephemeral digest only: never write Cookie contents or their hash to disk/logs.
+    if (-not (Test-Path -LiteralPath $script:cookiePath -PathType Leaf)) { return '' }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($script:cookiePath)
+        if ($bytes.Length -eq 0) { return '' }
+        return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '')
+    } catch { return '' }
+    finally { $sha.Dispose() }
+}
+function Update-LoginState {
+    $digest = Get-CookieDigest
+    if (-not $digest) {
+        $script:loginProbeState = ''
+        $script:loginProbeCookieDigest = ''
+        $script:loginProbeCheckedAt = $null
+        (Control 'LoginStateText').Text = '尚无可验证的本地登录凭证'
+        return
+    }
+    if ($script:loginProbeCookieDigest -ne $digest) {
+        # A login, logout or account switch invalidates the old verification.
+        $script:loginProbeState = ''
+        $script:loginProbeCookieDigest = ''
+        $script:loginProbeCheckedAt = $null
+    }
+    $time = if ($null -ne $script:loginProbeCheckedAt) {
+        '（最近 ' + $script:loginProbeCheckedAt.ToString('HH:mm') + '）'
+    } else { '' }
+    (Control 'LoginStateText').Text = switch ($script:loginProbeState) {
+        'checking' { '正在检查服务端登录及课程接口…' }
+        'confirmed' { '服务端登录已验证 · 两类课程接口正常' + $time }
+        'partial' { '服务端登录已验证 · 部分课程接口异常' + $time }
+        'course-failed' { '服务端登录已验证 · 课程接口均异常' + $time }
+        'session-unconfirmed' { '登录尚未确认 · 网络异常或凭证失效均有可能' }
+        'environment-error' { '登录检测未完成 · 检查运行环境' }
+        default { '存在本地凭证 · 尚未验证服务器登录' }
+    }
+}
 function Start-Task([string]$action) {
     if ($action -notin @('login','courses','progress','doctor')) { return }
     if (Any-TaskActive) {
@@ -125,6 +167,13 @@ function Start-Task([string]$action) {
         $script:runningTasks = @($proc)
         $script:activeTaskProcess = $proc
         $script:activeTaskAction = $action
+        if ($action -in @('login','doctor')) {
+            # Never carry forward a previous verification while logging in or probing.
+            $script:loginProbeState = if ($action -eq 'doctor') { 'checking' } else { '' }
+            $script:loginProbeCookieDigest = Get-CookieDigest
+            $script:loginProbeCheckedAt = $null
+            Update-LoginState
+        }
         if ($action -eq 'doctor') {
             (Control 'SyncMessageText').Text = '正在只读检查知到课程接口：不上传播放时长、不改变课程进度。'
         } elseif ($action -eq 'login') {
@@ -139,14 +188,16 @@ function Start-Task([string]$action) {
 }
 function Check-TaskExit {
     if ($null -eq $script:activeTaskProcess) { return }
+    $autoCheckAfterLogin = $false
     try {
         $script:activeTaskProcess.Refresh()
         if (-not $script:activeTaskProcess.HasExited) { return }
         $code = [int]$script:activeTaskProcess.ExitCode
         $action = $script:activeTaskAction
         if ($action -eq 'login') {
+            $autoCheckAfterLogin = ($code -eq 0)
             (Control 'SyncMessageText').Text = if ($code -eq 0) {
-                '扫码登录命令已结束。请点击“连接诊断”核验会话，再同步课程。'
+                '扫码登录命令已结束，正在自动检测服务端登录状态。'
             } else { '扫码登录未成功（退出码 '+$code+'）。请重新扫码，或检查网络和窗口中的提示。' }
         } elseif ($action -eq 'play-ai') {
             (Control 'SyncMessageText').Text = if ($code -eq 0) {
@@ -155,12 +206,24 @@ function Check-TaskExit {
                 'ZHS 原版任务异常退出（退出码 '+$code+'）。本程序不会自动重试或补发心跳；可检查原命令窗口中的错误并运行连接诊断。'
             }
         } elseif ($action -eq 'doctor') {
+            # A verified ZHS bootstrap is distinct from business endpoint health.
+            $script:loginProbeCookieDigest = Get-CookieDigest
+            $script:loginProbeCheckedAt = Get-Date
+            $script:loginProbeState = switch ($code) {
+                0 { 'confirmed' }
+                7 { 'partial' }
+                6 { 'course-failed' }
+                4 { 'session-unconfirmed' }
+                5 { 'environment-error' }
+                default { '' }
+            }
+            Update-LoginState
             (Control 'SyncMessageText').Text = switch ($code) {
                 0 { '服务器只读检测通过：共享课和智慧课程接口均已返回有效数据。可以同步课程。' }
                 3 { '连接诊断：本机缺少扫码凭证。请先扫码登录。' }
-                4 { '连接诊断：本机会话初始化失败。请检查登录状态和网络。' }
+                4 { '连接诊断：凭证格式异常，或服务器登录尚未确认。请先检查网络，必要时重新扫码。' }
                 5 { '连接诊断：服务器测试未完成。请检查本机运行环境。' }
-                6 { '连接诊断：两类服务器课程接口均未确认成功，请查看命令窗口的安全错误代码。' }
+                6 { '连接诊断：服务端登录已验证，但两类课程接口都失败。请查看命令窗口的安全错误代码。' }
                 7 { '连接诊断：部分课程接口成功、部分失败。可以查看已获取的课程，但仍需修复失败来源。' }
                 default { '连接诊断未完成（退出码 '+$code+'）。请检查命令窗口。' }
             }
@@ -178,6 +241,7 @@ function Check-TaskExit {
         $script:activeTaskAction = ''
         $script:runningTasks = @()
     }
+    if ($autoCheckAfterLogin) { Start-Task 'doctor' }
 }
 function Get-SessionFingerprint {
     $saltPath = Join-Path $script:dataDir 'zhidao-cache-salt.bin'
@@ -618,7 +682,7 @@ function Render-Data {
     (Control 'CompletedCountText').Text = if ($showCounts) { [string]$finished } else { '—' }
     (Control 'PendingCountText').Text = if ($showCounts) { [string]([Math]::Max(0,$total-$finished)) } else { '—' }
     (Control 'CourseSyncTimeText').Text = if ($script:hasCourses) { '课程同步：' + (Format-Time $script:coursesTimestamp) } else { '尚无课程缓存' }
-    (Control 'LoginStateText').Text = if (Test-Path -LiteralPath $script:cookiePath) { '存在本地凭证 · 未校验' } else { '尚无本地登录凭证' }
+    Update-LoginState
     $container = Control 'HomeCourseCards'; $container.Children.Clear()
     $left = Control 'CourseListPanel'; $left.Children.Clear()
     if ($script:courses.Count -eq 0) {
