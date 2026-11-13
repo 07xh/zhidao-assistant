@@ -1,0 +1,2 @@
+7973677845fc6ecd5b87d50637a650f178579011f7c5e8798336a63bc361aad3  ZhidaoAssistant-Setup-v5.2.8-hotfix3.exe
+697f4d55ac41648c1c7946166f5f52411a331abc437681ba3d6bb2662c1d7c47  ZhidaoAssistant-v5.2.8-hotfix3-source.zip

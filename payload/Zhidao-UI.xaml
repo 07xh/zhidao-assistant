@@ -1,0 +1,85 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="知到学习助手 · V5.2.8" Width="1120" Height="760" MinWidth="940" MinHeight="650" WindowStartupLocation="CenterScreen" Background="#F5F7FB" FontFamily="Microsoft YaHei UI" FontSize="14" Foreground="#17263D" UseLayoutRounding="True">
+  <Window.Resources>
+    <SolidColorBrush x:Key="Ink" Color="#192A42"/>
+    <SolidColorBrush x:Key="Muted" Color="#77849A"/>
+    <SolidColorBrush x:Key="Accent" Color="#2369D9"/>
+    <Style x:Key="NavButton" TargetType="Button">
+      <Setter Property="Height" Value="48"/><Setter Property="Margin" Value="0,4,0,4"/><Setter Property="Padding" Value="16,0"/>
+      <Setter Property="Foreground" Value="#C9D6E9"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="FontSize" Value="14"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="11"><ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Left" Margin="16,0"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#294366"/><Setter Property="Foreground" Value="White"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="PrimaryButton" TargetType="Button">
+      <Setter Property="Background" Value="#2369D9"/><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Padding" Value="18,11"/><Setter Property="Cursor" Value="Hand"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="13"/><Setter Property="Margin" Value="0,0,10,0"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.87"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"><Setter Property="Background" Value="#EAF0F9"/><Setter Property="Foreground" Value="#23549E"/></Style>
+    <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}"><Setter Property="Background" Value="#FFF0F0"/><Setter Property="Foreground" Value="#B14242"/></Style>
+    <Style x:Key="CardStyle" TargetType="Border"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#E6EBF3"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="16"/><Setter Property="Padding" Value="20"/></Style>
+    <Style x:Key="SectionTitle" TargetType="TextBlock"><Setter Property="FontSize" Value="19"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="#192A42"/></Style>
+  </Window.Resources>
+  <Grid>
+    <Grid.ColumnDefinitions><ColumnDefinition Width="222"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Border Background="#172C49" Grid.Column="0">
+      <Grid Margin="17,30,17,22"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="28"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel Margin="13,0,0,0"><TextBlock Text="知到学习助手" Foreground="White" FontSize="22" FontWeight="Bold"/><TextBlock Text="ZHIDAO DESKTOP  ·  V5.2.8" Foreground="#9FB1C8" FontSize="10" Margin="0,7,0,0"/></StackPanel>
+        <StackPanel Grid.Row="2"><TextBlock Text="工作台" Foreground="#91A7BF" FontSize="11" Margin="13,0,0,14"/><Button x:Name="NavHome" Style="{StaticResource NavButton}" Content="⌂   我的课程"/><Button x:Name="NavDetail" Style="{StaticResource NavButton}" Content="▤   课程详情"/><Button x:Name="NavSettings" Style="{StaticResource NavButton}" Content="⚙   设置与隐私"/></StackPanel>
+        <StackPanel Grid.Row="3" Margin="13,0"><TextBlock Text="仅知到 App · 共享课 / 智慧课程" Foreground="#BED0E5" FontSize="11"/><TextBlock Text="第三方非官方 · 双模式" Foreground="#91A7BF" Margin="0,7,0,0" FontSize="11"/></StackPanel>
+      </Grid>
+    </Border>
+    <Grid Grid.Column="1"><Grid.RowDefinitions><RowDefinition Height="76"/><RowDefinition Height="*"/><RowDefinition Height="40"/></Grid.RowDefinitions>
+      <Border Grid.Row="0" Background="White" BorderBrush="#E7ECF3" BorderThickness="0,0,0,1"><Grid Margin="29,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel VerticalAlignment="Center"><TextBlock x:Name="PageHeading" Text="我的课程" FontSize="20" FontWeight="SemiBold"/><TextBlock x:Name="PageSubtitle" Text="查看本人课程与服务器学习进度" Foreground="#77849A" FontSize="11" Margin="0,5,0,0"/></StackPanel><Border Grid.Column="1" CornerRadius="18" Background="#EAF6EE" Padding="14,8" VerticalAlignment="Center"><TextBlock x:Name="LoginStateText" Text="未确认登录" Foreground="#3B8159" FontSize="12"/></Border></Grid></Border>
+      <!-- Home view -->
+      <ScrollViewer x:Name="PageHome" Grid.Row="1" VerticalScrollBarVisibility="Auto"><StackPanel Margin="28,26,28,26">
+        <TextBlock Text="学习概览" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
+        <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Style="{StaticResource CardStyle}"><StackPanel><TextBlock Text="我的课程" Foreground="#77849A" FontSize="12"/><TextBlock x:Name="CourseCountText" Text="—" FontSize="32" FontWeight="Bold" Margin="0,12,0,0"/><TextBlock Text="共享课 + 智慧课程" Foreground="#9AA6B6" FontSize="11"/></StackPanel></Border>
+          <Border Grid.Column="2" Style="{StaticResource CardStyle}"><StackPanel><TextBlock Text="已完成/满进度项" Foreground="#77849A" FontSize="12"/><TextBlock x:Name="CompletedCountText" Text="—" FontSize="32" FontWeight="Bold" Margin="0,12,0,0"/><TextBlock Text="以平台记录为准" Foreground="#9AA6B6" FontSize="11"/></StackPanel></Border>
+          <Border Grid.Column="4" Style="{StaticResource CardStyle}"><StackPanel><TextBlock Text="未完成 / 未确认" Foreground="#77849A" FontSize="12"/><TextBlock x:Name="PendingCountText" Text="—" FontSize="32" FontWeight="Bold" Margin="0,12,0,0"/><TextBlock Text="不代表全部到期任务" Foreground="#9AA6B6" FontSize="11"/></StackPanel></Border>
+        </Grid>
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,22"><StackPanel><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="同步学习数据" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="此区域只读查询；ZHS 原版模式需手动选择并确认" Foreground="#78869A" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"><Button x:Name="BtnSyncCourses" Style="{StaticResource SecondaryButton}" Content="同步课程"/><Button x:Name="BtnSyncProgress" Style="{StaticResource PrimaryButton}" Content="同步学习进度" Margin="0"/></StackPanel></Grid><TextBlock x:Name="SyncMessageText" Text="尚未开始同步" Foreground="#60758C" FontSize="12" Margin="0,14,0,0"/></StackPanel></Border>
+        <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="课程列表" Style="{StaticResource SectionTitle}"/><TextBlock x:Name="CourseSyncTimeText" Text="尚无缓存" Grid.Column="1" Foreground="#8B97A9" FontSize="12" VerticalAlignment="Center"/></Grid>
+        <StackPanel x:Name="HomeCourseCards"/>
+      </StackPanel></ScrollViewer>
+      <!-- Detail view -->
+      <Grid x:Name="PageDetail" Grid.Row="1" Visibility="Collapsed" Margin="28,26,28,20"><Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border Style="{StaticResource CardStyle}" Padding="0"><DockPanel><TextBlock Text="选择课程" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="18,18,18,10"/><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="CourseListPanel" Margin="10,0,10,10"/></ScrollViewer></DockPanel></Border>
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock x:Name="DetailTitleText" Text="选择左侧课程查看学习项目" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="DetailMetaText" Text="只展示上次成功同步的服务器学习记录" Grid.Row="1" Foreground="#718096" FontSize="12" Margin="0,8,0,16" TextWrapping="Wrap"/><StackPanel Grid.Row="2" Margin="0,0,0,14">
+          <TextBlock Text="播放 / 心跳模式" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,7"/>
+          <ComboBox x:Name="PlaybackModeSelector" Width="290" Height="34" HorizontalAlignment="Left" Margin="0,0,0,10" SelectedIndex="0">
+            <ComboBoxItem Content="官方网页 · 真实观看心跳"/>
+            <ComboBoxItem Content="ZHS 原版 · 模拟观看心跳"/>
+          </ComboBox>
+          <WrapPanel Margin="0,0,0,9" VerticalAlignment="Center">
+            <TextBlock Text="官方视频倍速" FontSize="12" Foreground="#506987" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <ComboBox x:Name="PlaybackSpeedSelector" Width="108" Height="30" SelectedIndex="2" Margin="0,0,18,0">
+              <ComboBoxItem Content="1.0×"/>
+              <ComboBoxItem Content="1.25×"/>
+              <ComboBoxItem Content="1.5×"/>
+              <ComboBoxItem Content="2.0×"/>
+            </ComboBox>
+            <CheckBox x:Name="AllowMinimizeCheck" Content="允许最小化窗口" IsChecked="True" FontSize="12" Foreground="#506987" VerticalAlignment="Center"/>
+          </WrapPanel>
+          <WrapPanel Margin="0,0,0,9">
+            <CheckBox x:Name="AutoStartCheck" Content="进入视频后自动播放" IsChecked="True" FontSize="12" Foreground="#506987" Margin="0,0,18,0" VerticalAlignment="Center"/>
+            <CheckBox x:Name="AutoNextCheck" Content="本节结束后自动下一节" IsChecked="True" FontSize="12" Foreground="#506987" VerticalAlignment="Center"/>
+          </WrapPanel>
+          <WrapPanel Margin="0,0,0,9">
+            <Button x:Name="BtnOpenLearning" Style="{StaticResource PrimaryButton}" Content="打开官方学习页"/>
+            <Button x:Name="BtnVerifyOne" Style="{StaticResource SecondaryButton}" Content="核验此课进度"/>
+            <Button x:Name="BtnMonitorToggle" Style="{StaticResource SecondaryButton}" Content="开启定时核验" Margin="0"/>
+          </WrapPanel>
+          <TextBlock x:Name="HeartbeatStatusText" Text="官方 WebView2 真实播放；1.5×仅在网页播放器允许时生效；最小化可能受到浏览器后台播放限制。" Foreground="#718096" FontSize="11" TextWrapping="Wrap"/>
+        </StackPanel><ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="VideoListPanel"/></ScrollViewer></Grid></Border>
+      </Grid>
+      <!-- Settings view -->
+      <ScrollViewer x:Name="PageSettings" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel Margin="28,26,28,28"><TextBlock Text="账号与隐私" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,15"><StackPanel><TextBlock Text="知到账号" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="使用知到 App 扫码登录；登录凭证保存在当前 Windows 用户目录。" Foreground="#78869A" FontSize="12" Margin="0,6,0,17" TextWrapping="Wrap"/><WrapPanel><Button x:Name="BtnLogin" Style="{StaticResource PrimaryButton}" Content="扫码登录"/><Button x:Name="BtnQR" Style="{StaticResource SecondaryButton}" Content="查看登录二维码"/><Button x:Name="BtnDiagnose" Style="{StaticResource SecondaryButton}" Content="连接诊断"/><Button x:Name="BtnSignOut" Style="{StaticResource DangerButton}" Content="退出并清除 Cookie"/></WrapPanel></StackPanel></Border>
+        <Border Style="{StaticResource CardStyle}" Margin="0,0,0,15"><StackPanel><TextBlock Text="本地学习数据" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="课程列表和进度仅保存在电脑本地，删除不影响知到服务器数据。" Foreground="#78869A" FontSize="12" Margin="0,6,0,17" TextWrapping="Wrap"/><WrapPanel><Button x:Name="BtnDataFolder" Style="{StaticResource SecondaryButton}" Content="打开数据目录"/><Button x:Name="BtnClearData" Style="{StaticResource DangerButton}" Content="删除课程与进度缓存"/><Button x:Name="BtnClearWebLogin" Style="{StaticResource DangerButton}" Content="清除官方网页登录态"/></WrapPanel></StackPanel></Border>
+        <Border Style="{StaticResource CardStyle}"><StackPanel><TextBlock Text="关于本软件" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="第三方、非官方、免费。底层使用 ZHS v0.1.5，遵循 GPL-3.0-only。" Foreground="#78869A" FontSize="12" Margin="0,6,0,17" TextWrapping="Wrap"/><WrapPanel><Button x:Name="BtnTerms" Style="{StaticResource SecondaryButton}" Content="使用声明"/><Button x:Name="BtnPrivacy" Style="{StaticResource SecondaryButton}" Content="隐私说明"/><Button x:Name="BtnLicense" Style="{StaticResource SecondaryButton}" Content="GPL 开源许可"/><Button x:Name="BtnOfficial" Style="{StaticResource SecondaryButton}" Content="官方知到网站" Margin="0"/></WrapPanel></StackPanel></Border>
+      </StackPanel></ScrollViewer>
+      <Border Grid.Row="2" BorderBrush="#E7ECF3" BorderThickness="0,1,0,0" Background="White"><TextBlock x:Name="BottomStatusText" VerticalAlignment="Center" Margin="28,0" Foreground="#8B97A9" FontSize="11" Text="V5.2.8 · 单主视频控制与服务器进度核验 · 第三方非官方工具"/></Border>
+    </Grid>
+  </Grid>
+</Window>
