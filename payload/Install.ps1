@@ -205,13 +205,13 @@ $files = @(Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 -ErrorActi
 if ($files.Count -lt 2 -or $files -notcontains 'ZhidaoAssistant.exe' -or
     $files -notcontains 'install-files.json') { throw 'Invalid installer resource manifest.' }
 $seenNames = @{}
+$invalidNameChars = [System.IO.Path]::GetInvalidFileNameChars()
 foreach ($name in $files) {
-    if ($name -isnot [string] -or [string]::IsNullOrWhiteSpace($name) -or
-        $name -eq '.' -or $name -eq '..' -or
-        $name.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0 -or
-        $seenNames.ContainsKey($name)) {
-        throw 'Invalid or duplicated installer resource name.'
-    }
+    if ($name -isnot [string]) { throw 'Invalid installer resource type.' }
+    if ([string]::IsNullOrWhiteSpace($name)) { throw 'Empty installer resource name.' }
+    if ($name -eq '.' -or $name -eq '..') { throw 'Invalid installer path.' }
+    if ($name.IndexOfAny($invalidNameChars) -ge 0) { throw 'Invalid installer path character.' }
+    if ($seenNames.ContainsKey($name)) { throw 'Duplicate installer resource name.' }
     $seenNames[$name] = $true
 }
 # Validate every payload file before modifying the previous installation.
