@@ -7,12 +7,13 @@ import unittest
 from pathlib import Path
 
 GUI = (Path(__file__).parent / "payload" / "Zhidao-GUI.ps1").read_text("utf-8-sig")
+SESSION = (Path(__file__).parent / "payload" / "SessionState.ps1").read_text("utf-8-sig")
 ADAPTER = (Path(__file__).parent / "payload" / "zhidao_only.py").read_text("utf-8")
 
 
 class LoginDisplayTests(unittest.TestCase):
     def test_cookie_bound_status_cannot_survive_session_rotation(self):
-        block = GUI.split("function Update-LoginState {", 1)[1].split("function Start-Task(", 1)[0]
+        block = SESSION.split("function Update-LoginState {", 1)[1]
         self.assertIn("Get-CookieDigest", block)
         self.assertIn("$script:loginProbeCookieDigest -ne $digest", block)
         self.assertIn("$script:loginProbeState = ''", block)
@@ -36,6 +37,9 @@ class LoginDisplayTests(unittest.TestCase):
     def test_home_login_label_is_no_longer_frozen(self):
         self.assertNotIn("存在本地凭证 · 未校验' } else", GUI)
         self.assertIn("    Update-LoginState\n", GUI)
+        self.assertIn(". (Join-Path $script:root 'SessionState.ps1')", GUI)
+        self.assertNotIn("function Get-CookieDigest {", GUI)
+        self.assertNotIn("function Update-LoginState {", GUI)
 
 
 if __name__ == "__main__":
