@@ -206,9 +206,14 @@ if ($files.Count -lt 2 -or $files -notcontains 'ZhidaoAssistant.exe' -or
     $files -notcontains 'install-files.json') { throw 'Invalid installer resource manifest.' }
 $seenNames = @{}
 foreach ($name in $files) {
-    if ($name -isnot [string] -or -not $name -or
+    if ($name -isnot [string] -or [string]::IsNullOrWhiteSpace($name) -or
         $name -eq '.' -or $name -eq '..' -or
-        $name -notmatch '^[^\\/:*?"<>|]+
+        $name.IndexOfAny([System.IO.Path]::GetInvalidFileNameChars()) -ge 0 -or
+        $seenNames.ContainsKey($name)) {
+        throw 'Invalid or duplicated installer resource name.'
+    }
+    $seenNames[$name] = $true
+}
 # Validate every payload file before modifying the previous installation.
 # The Python/ZHS virtual environment and shared ~/.zhs user data are never staged/removed here.
 $stageDir = Join-Path $env:TEMP ('zhidao-app-stage-' + [Guid]::NewGuid().ToString('N'))
