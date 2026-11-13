@@ -77,7 +77,10 @@ jobs:
             $parseErrors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors)
             if ($parseErrors.Count -gt 0) {
-              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              $parseErrors | ForEach-Object {
+                Write-Host ("Syntax issue {0}:{1}:{2} {3}" -f $_.Extent.File, $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message)
+                Write-Host ("  Source: " + $_.Extent.Text)
+              }
               throw "PowerShell parser failed: $($_.Name)"
             }
             Write-Host "Parsed $($_.Name)"
