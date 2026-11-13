@@ -1,4 +1,4 @@
-﻿# SPDX-License-Identifier: GPL-3.0-only
+﻿﻿# SPDX-License-Identifier: GPL-3.0-only
 # Safe local diagnostic: only booleans and app version; no filenames, cookies, IDs, or URL values exported.
 param([switch]$SaveReport)
 $ErrorActionPreference = 'Stop'
