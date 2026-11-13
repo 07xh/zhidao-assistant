@@ -23,7 +23,7 @@ assert 'Stop-ZhidaoAppProcesses -InstallRoot $root' in uninstaller
 assert 'Read-Host' not in installer
 assert 'Wait-LauncherAvailable' not in installer
 assert 'Assert-LauncherAvailable' in installer
-assert "'AppLifecycle.ps1'" in installer
+assert "'install-files.json'" in installer
 assert 'Get-FileHash -LiteralPath $src -Algorithm SHA256' in installer
 assert "foreach ($oldName in @('ZHS-CLI.cmd','ZHS-GUI.ps1'))" in installer
 assert "Remove-Item -LiteralPath $root -Recurse -Force" not in installer
