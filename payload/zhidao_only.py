@@ -180,6 +180,12 @@ def identity(course: dict[str, Any]) -> tuple[str, str, str]:
     return ("shared", "name:" + str(course.get("name") or ""), "")
 
 
+def progress_key(course: dict[str, Any]) -> str:
+    """Non-reversible identity key for failed-course bookkeeping (no raw route in logs)."""
+    raw = json.dumps(identity(course), ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 class ResponseShapeError(ValueError):
     """An API response changed shape; no raw response or token should reach UI logs."""
 
@@ -517,12 +523,27 @@ def verify_one(course_type: str, course_id: str, class_id: str = "") -> int:
             empty_sources = old.get("unconfirmedEmptySources") if isinstance(old.get("unconfirmedEmptySources"), list) else []
             names = old.get("failedCourses") if isinstance(old.get("failedCourses"), list) else []
             details = old.get("failedCourseDetails") if isinstance(old.get("failedCourseDetails"), list) else []
+            keys = old.get("failedCourseKeys") if isinstance(old.get("failedCourseKeys"), list) else []
+            if len(keys) != len(names):
+                keys = [None] * len(names)  # Legacy cache: no stable failure identity.
+            target_key = progress_key(selected)
+            # Legacy names may collide. Only clear a legacy marker when it is
+            # unique in both the failure list and the cached course directory.
+            safe_legacy = (names.count(selected.get("name")) == 1
+                           and sum(isinstance(row, dict) and
+                                   row.get("name") == selected.get("name")
+                                   for row in cached) == 1)
             remaining_names = []
             remaining_details = []
+            remaining_keys = []
             for index, name in enumerate(names):
-                if name == selected.get("name"):
+                key = keys[index]
+                if key == target_key or (
+                    key is None and safe_legacy and name == selected.get("name")
+                ):
                     continue
                 remaining_names.append(name)
+                remaining_keys.append(key)
                 if index < len(details):
                     remaining_details.append(details[index])
             # Old caches can have unstructured error markers. Unknown errors
@@ -537,7 +558,8 @@ def verify_one(course_type: str, course_id: str, class_id: str = "") -> int:
                     "failedSourceDetails": old.get("failedSourceDetails", []),
                     "unconfirmedEmptySources": empty_sources,
                     "failedCourses": remaining_names,
-                    "failedCourseDetails": remaining_details}
+                    "failedCourseDetails": remaining_details,
+                    "failedCourseKeys": remaining_keys}
         update_cache(PROGRESS, updated, fp)
         print("[VERIFIED] 已从服务器重新读取选定课程状态；本地播放时间不等于官方完成证明")
         return 0
@@ -654,6 +676,7 @@ def main(mode: str) -> int:
         prior_by_id = {identity(x): x for x in prior_rows if isinstance(x, dict)}
         progress_rows = []
         failed_courses = []
+        failed_course_keys = []
         failed_detail_codes = []
         for row in courses:
             key = identity(row)
@@ -668,6 +691,7 @@ def main(mode: str) -> int:
                 progress_rows.append(detail)
             except Exception as exc:
                 failed_courses.append(row["name"])
+                failed_course_keys.append(progress_key(row))
                 failed_detail_codes.append(diagnostic("单课进度", exc))
                 old = prior_by_id.get(key)
                 if old:
@@ -691,7 +715,8 @@ def main(mode: str) -> int:
                     "incomplete": bool(errors or failed_courses or unconfirmed_empty_sources),
                     "failedSources": errors, "failedSourceDetails": details,
                     "unconfirmedEmptySources": unconfirmed_empty_sources,
-                    "failedCourses": failed_courses, "failedCourseDetails": failed_detail_codes}
+                    "failedCourses": failed_courses, "failedCourseDetails": failed_detail_codes,
+                    "failedCourseKeys": failed_course_keys}
         update_cache(PROGRESS, updated_progress, fp)
         print(f"已保存 {len(progress_rows)} 门课程的可用进度；未完成同步的来源会明确标注。")
         return 1 if errors or failed_courses or unconfirmed_empty_sources else 0
