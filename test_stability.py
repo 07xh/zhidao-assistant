@@ -28,7 +28,7 @@ assert "DisplayVersion -Value '5.2.8'" in installer
 assert 'Zhidao Assistant V5.2.8' in installer
 assert installer.count('& $uv venv --python $pythonSource $venv') == 1
 build = (ROOT / 'build.py').read_text(encoding='utf-8')
-assert 'ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe' in build
+assert 'ZhidaoAssistant-Setup-v5.2.8-dev.exe' in build
 
 go_installer = (ROOT / 'src' / 'installer.go').read_text(encoding='utf-8')
 assert 'V5.2.8' in go_installer
@@ -39,7 +39,7 @@ assert 'Get-SessionFingerprint' in gui and 'sessionFingerprint -ceq $currentFing
 assert 'if (Launch-Verify $true $target)' in gui
 assert 'Load-PendingVerify' in gui and 'Check-VerifyExit' in gui
 assert 'Get-FileHash -LiteralPath (Join-Path $stageDir $name)' in installer
-assert 'AppLifecycle.ps1' in installer
+assert 'install-files.json' in installer
 assert 'AppLifecycle.ps1' in read('Uninstall.ps1')
 assert 'RemoveZhsData' in read('Uninstall.ps1') and 'cannot delete the shared .zhs folder' in read('Uninstall.ps1')
 
