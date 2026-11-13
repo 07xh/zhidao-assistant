@@ -2,15 +2,11 @@
 
 **已发布测试版：** [v5.2.8-hotfix10](https://github.com/07xh/zhidao-assistant/releases/tag/v5.2.8-hotfix10)，二进制与 tag 保持原样。
 
-**当前 main：未发布开发版（v5.2.8-dev）。** 已实施共享安装资源白名单、隔离可重复 ZIP 打包、环境版本明确校验、同名课程失败记录身份隔离，并清理过时的发布工作流。修改及未完成的技术债请查阅 [CODE-AUDIT.md](CODE-AUDIT.md)。开发版安装器可在最新成功的 [CI Actions](https://github.com/07xh/zhidao-assistant/actions/workflows/ci.yml) 运行记录中获取；它**不是**正式 Release，也未经真实 Windows/知到账号的端到端验收。
-
-
+**当前 main：未发布开发版（v5.2.8-dev）。** 已实施共享安装资源白名单、隔离可重复 ZIP 打包、环境版本明确校验、同名课程失败记录身份隔离，并清理过时的发布工作流。进一步拆分为独立的 `SessionState.ps1`（GUI 登录状态）、`zhidao_diagnostics.py`（错误分类与脱敏）、`zhidao_courses.py`（课程身份及历史缓存策略），并增加 Windows 假 Cookie 状态测试。修改及未完成的技术债请查阅 [CODE-AUDIT.md](CODE-AUDIT.md)。开发版安装器可在最新成功的 [CI Actions](https://github.com/07xh/zhidao-assistant/actions/workflows/ci.yml) 运行记录中获取；它**不是**正式 Release，也未经真实 Windows/知到账号的端到端验收。
 
 **开发分支最新修复（尚未进入 Hotfix10 Release）：** 单课只读核验成功后，准确更新对应的失败标记；其他失败来源继续保留；首页在同步不完整或存在历史记录时隐藏总进度统计；历史完成状态显示为待核验。增加了异常脱敏和针对性离线测试。这些修改不涉及 ZHS 心跳生成/发送算法。可在 [GitHub Actions](https://github.com/07xh/zhidao-assistant/actions/workflows/ci.yml) 核对最新源码构建情况。最新可直接下载的 Release 仍为 Hotfix10，**并未包含这批开发分支修复**。
 
 **最新登录检测修复：** 扫码后自动进行只读服务端诊断；明确区分本地 Cookie 缺失/损坏、会话未确认与课程接口失败；最近一次登录验证状态随 Cookie 更换立即失效。详见 [Hotfix10 更新说明](CHANGELOG-HOTFIX10.md)。
-
-
 
 本版为 V5.2.7 的升级维护：再次运行安装器会自动结束属于当前用户同一个安装目录的旧版程序和播放器，然后就地替换程序文件、移除已知旧版启动脚本和更新卸载项。不会执行旧版本自带的卸载器，也不会删除 `.zhs` 登录数据或重建已有效的 Python/ZHS 虚拟环境。
 
@@ -18,6 +14,6 @@
 
 原有 V5.2.7 官方播放器、只读课程核验和 ZHS 0.1.5 依赖保持原样。本版仍未进行 Windows 真机升级/安装/卸载验收，不代表真实课程可用性已验证；首次安装可能需要联网下载依赖。
 
-开发版构建：`python build.py`（生成 `ZhidaoAssistant-Setup-v5.2.8-dev.exe`）。测试：`python test_cache_v527.py`、`python test_stability.py`、`python test_lifecycle_v528.py`、`node test_media_controller.cjs`。
+开发版构建：`python build.py`（生成 `ZhidaoAssistant-Setup-v5.2.8-dev.exe`）。测试：`python -m unittest discover -v -p 'test_*.py'`、`node test_media_controller.cjs`；Windows 专项：`powershell -NoProfile -File test_session_state.ps1`。完整自动化检查见 `.github/workflows/ci.yml`。
 
 本项目为非官方工具，GPL-3.0-only。
