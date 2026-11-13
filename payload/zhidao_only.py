@@ -280,7 +280,8 @@ def doctor_server() -> int:
     No write operation, cached course mutation, video progress submission,
     sensitive identifiers or raw HTTP exception output is performed.
     Return 0=both read endpoints confirmed, 7=partial, 6=neither,
-    3=no credential, 4=no local SDK session, 5=unexpected bootstrap failure.
+    3=no credential, 4=SDK login check failed/unknown, 5=unexpected bootstrap failure,
+    8=malformed local credential file.
     """
     state = local_login_file_state()
     if state == "missing":
@@ -288,7 +289,7 @@ def doctor_server() -> int:
         return 3
     if state == "invalid":
         print("[AUTH_LOCAL_INVALID] 本地登录凭证格式无效；未联系服务器，建议重新扫码登录。")
-        return 4
+        return 8
     os.chdir(Path.home())
     session = None
     try:
