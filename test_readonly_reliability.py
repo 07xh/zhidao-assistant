@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
+import contextlib
+import io
 from pathlib import Path
 from unittest.mock import patch
 
@@ -66,7 +69,7 @@ class ReadReliabilityTests(unittest.TestCase):
         session = FakeSession()
         with tempfile.TemporaryDirectory() as d:
             data = Path(d)
-            (data / 'cookies.json').write_text('FAKE ONLY')
+            (data / 'cookies.json').write_text(json.dumps([{'name': 'session', 'value': 'FAKE ONLY'}]))
             def shared_reader(_):
                 if exceptions[0] is not None:
                     raise exceptions[0]
@@ -87,6 +90,54 @@ class ReadReliabilityTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in data.iterdir()), ['cookies.json'])
             return result
 
+    def test_missing_credentials_do_not_reach_server(self):
+        with tempfile.TemporaryDirectory() as d, \\
+             patch.object(app, 'DATA', Path(d)), \\
+             patch.object(app, 'load_config_and_session') as loader:
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(app.doctor_server(), 3)
+            loader.assert_not_called()
+            self.assertIn('[AUTH]', output.getvalue())
+
+    def test_corrupt_cookie_file_is_not_server_login(self):
+        for content in ('', '{broken', '{}', '[]', '[{"name":"x"}]'):
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as d, \\
+                 patch.object(app, 'DATA', Path(d)), \\
+                 patch.object(app, 'load_config_and_session') as loader:
+                (Path(d) / 'cookies.json').write_text(content)
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(app.doctor_server(), 4)
+                loader.assert_not_called()
+                self.assertIn('[AUTH_LOCAL_INVALID]', output.getvalue())
+
+    def test_local_bootstrap_unavailable_is_not_labeled_expired(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'cookies.json').write_text('[{"name":"x","value":"placeholder"}]')
+            with patch.object(app, 'DATA', Path(d)), \\
+                 patch.object(app.os, 'chdir'), \\
+                 patch.object(app, 'load_config_and_session', return_value=None):
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(app.doctor_server(), 4)
+            self.assertIn('[AUTH_OR_NETWORK]', output.getvalue())
+            self.assertNotIn('已过期', output.getvalue())
+
+    def test_all_course_endpoints_fail_does_not_revoke_verified_login(self):
+        session = FakeSession()
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'cookies.json').write_text('[{"name":"x","value":"placeholder"}]')
+            with patch.object(app, 'DATA', Path(d)), \\
+                 patch.object(app.os, 'chdir'), \\
+                 patch.object(app, 'load_config_and_session', return_value=(object(),session)), \\
+                 patch.object(app, 'ZhidaoCourseManager', return_value=object()), \\
+                 patch.object(app, 'shared_course_list', side_effect=HttpFailure(503)), \\
+                 patch.object(app, 'ai_course_list', side_effect=HttpFailure(503)), \\
+                 patch.object(app.time, 'sleep', return_value=None):
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.assertEqual(app.doctor_server(), 6)
+        self.assertIn('[SESSION_OK]', output.getvalue())
+        self.assertIn('[SERVER_UNCONFIRMED]', output.getvalue())
+        self.assertTrue(session.closed)
+
     def test_server_probe_both_success_even_if_empty(self):
         self.assertEqual(self.run_doctor(), 0)
 
@@ -103,6 +154,7 @@ class ReadReliabilityTests(unittest.TestCase):
             self.run_doctor()
         self.assertNotIn('FAKE ONLY',capture.getvalue())
         self.assertIn('SERVER_OK',capture.getvalue())
+        self.assertIn('SESSION_OK',capture.getvalue())
 
     def test_gui_doctor_is_real_read_only_probe(self):
         root = Path(__file__).parent
