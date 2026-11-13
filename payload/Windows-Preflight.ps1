@@ -25,7 +25,7 @@ $sdkOK = (Test-Path -LiteralPath (Join-Path $root 'webview2\Microsoft.Web.WebVie
          (Test-Path -LiteralPath (Join-Path $root 'webview2\Microsoft.Web.WebView2.Wpf.dll')) -and
          (Test-Path -LiteralPath (Join-Path $root 'webview2\runtimes\win-x64\native\WebView2Loader.dll'))
 $report = [ordered]@{
-    application = 'ZhidaoAssistant'; build = '5.2.7';
+    application = 'ZhidaoAssistant'; build = '5.2.8-dev';
     windows64bit = [Environment]::Is64BitOperatingSystem;
     scriptsPresent = $scriptOK; pythonPresent = $pyOK; zhs015Ready = $zhsOK;
     webview2SdkPresent = $sdkOK; webview2RuntimeRegistryHint = $runtimeOK;
@@ -35,7 +35,7 @@ $report = [ordered]@{
 $json = $report | ConvertTo-Json -Depth 3
 Write-Host $json
 if ($SaveReport) {
-    $file = Join-Path ([Environment]::GetFolderPath('Desktop')) 'zhidao-preflight-v526.json'
+    $file = Join-Path ([Environment]::GetFolderPath('Desktop')) 'zhidao-preflight-v528-dev.json'
     [System.IO.File]::WriteAllText($file,$json,[System.Text.Encoding]::UTF8)
     Write-Host 'Diagnostic saved on Desktop; review before sharing.'
 }
