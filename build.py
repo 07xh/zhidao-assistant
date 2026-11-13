@@ -8,7 +8,7 @@ import zipfile
 BASE = Path(__file__).resolve().parent
 SRC = BASE / 'src'
 PAYLOAD = BASE / 'payload'
-OUTPUT = BASE / 'ZhidaoAssistant-Setup-v5.2.8-hotfix9-zhs-reliability.exe'
+OUTPUT = BASE / 'ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe'
 ENV = dict(os.environ, GOOS='windows', GOARCH='amd64', CGO_ENABLED='0')
 subprocess.run(['go','build','-trimpath','-ldflags=-s -w -H=windowsgui','-o',str(PAYLOAD/'ZhidaoAssistant.exe'),'launcher.go'],cwd=SRC,env=ENV,check=True)
 with zipfile.ZipFile(SRC / 'payload.zip', 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=8) as z:
