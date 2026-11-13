@@ -91,8 +91,8 @@ class ReadReliabilityTests(unittest.TestCase):
             return result
 
     def test_missing_credentials_do_not_reach_server(self):
-        with tempfile.TemporaryDirectory() as d, \\
-             patch.object(app, 'DATA', Path(d)), \\
+        with tempfile.TemporaryDirectory() as d, \
+             patch.object(app, 'DATA', Path(d)), \
              patch.object(app, 'load_config_and_session') as loader:
             with contextlib.redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(app.doctor_server(), 3)
@@ -101,8 +101,8 @@ class ReadReliabilityTests(unittest.TestCase):
 
     def test_corrupt_cookie_file_is_not_server_login(self):
         for content in ('', '{broken', '{}', '[]', '[{"name":"x"}]'):
-            with self.subTest(content=content), tempfile.TemporaryDirectory() as d, \\
-                 patch.object(app, 'DATA', Path(d)), \\
+            with self.subTest(content=content), tempfile.TemporaryDirectory() as d, \
+                 patch.object(app, 'DATA', Path(d)), \
                  patch.object(app, 'load_config_and_session') as loader:
                 (Path(d) / 'cookies.json').write_text(content)
                 with contextlib.redirect_stdout(io.StringIO()) as output:
@@ -113,8 +113,8 @@ class ReadReliabilityTests(unittest.TestCase):
     def test_local_bootstrap_unavailable_is_not_labeled_expired(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / 'cookies.json').write_text('[{"name":"x","value":"placeholder"}]')
-            with patch.object(app, 'DATA', Path(d)), \\
-                 patch.object(app.os, 'chdir'), \\
+            with patch.object(app, 'DATA', Path(d)), \
+                 patch.object(app.os, 'chdir'), \
                  patch.object(app, 'load_config_and_session', return_value=None):
                 with contextlib.redirect_stdout(io.StringIO()) as output:
                     self.assertEqual(app.doctor_server(), 4)
@@ -125,12 +125,12 @@ class ReadReliabilityTests(unittest.TestCase):
         session = FakeSession()
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / 'cookies.json').write_text('[{"name":"x","value":"placeholder"}]')
-            with patch.object(app, 'DATA', Path(d)), \\
-                 patch.object(app.os, 'chdir'), \\
-                 patch.object(app, 'load_config_and_session', return_value=(object(),session)), \\
-                 patch.object(app, 'ZhidaoCourseManager', return_value=object()), \\
-                 patch.object(app, 'shared_course_list', side_effect=HttpFailure(503)), \\
-                 patch.object(app, 'ai_course_list', side_effect=HttpFailure(503)), \\
+            with patch.object(app, 'DATA', Path(d)), \
+                 patch.object(app.os, 'chdir'), \
+                 patch.object(app, 'load_config_and_session', return_value=(object(),session)), \
+                 patch.object(app, 'ZhidaoCourseManager', return_value=object()), \
+                 patch.object(app, 'shared_course_list', side_effect=HttpFailure(503)), \
+                 patch.object(app, 'ai_course_list', side_effect=HttpFailure(503)), \
                  patch.object(app.time, 'sleep', return_value=None):
                 with contextlib.redirect_stdout(io.StringIO()) as output:
                     self.assertEqual(app.doctor_server(), 6)
