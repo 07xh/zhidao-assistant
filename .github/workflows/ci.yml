@@ -49,8 +49,8 @@ jobs:
       - name: Cross-compile installer and inspect PE header
         run: |
           python build.py
-          file ZhidaoAssistant-Setup-v5.2.8-hotfix9-zhs-reliability.exe
-          file ZhidaoAssistant-Setup-v5.2.8-hotfix9-zhs-reliability.exe | grep -q PE32
+          file ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe
+          file ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe | grep -q PE32
 
   windows-syntax:
     name: Windows PowerShell 5.1 source parse
