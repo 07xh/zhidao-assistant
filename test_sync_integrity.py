@@ -102,10 +102,78 @@ class SyncIntegrityTests(unittest.TestCase):
         with self.assertRaises(app.ResponseShapeError):
             app.shared_course_list(manager)
 
+    def test_one_course_reverify_resolves_only_its_own_failed_marker(self):
+        course = {'courseType': 'ai', 'courseId': 70, 'classId': 4, 'name': 'Examined'}
+        app.update_cache(app.COURSES, lambda _: {'courses': [course]}, self.fp)
+        app.update_cache(app.PROGRESS, lambda _: {
+            'courses': [{**course, 'stale': True}],
+            'incomplete': True,
+            'failedCourses': ['Examined'],
+            'failedCourseDetails': [{'source': '单课进度', 'code': 'TIMEOUT'}],
+            'failedSources': [],
+            'unconfirmedEmptySources': [],
+        }, self.fp)
+        detail = {**course, 'stale': False, 'knowledgePointCount': 1,
+                  'fullProgressPoints': 1, 'knowledgePoints': [],
+                  'lastVerifiedAt': '2026-11-13T14:00:00+00:00'}
+        session = FakeSession()
+        with patch.object(app.os, 'chdir'), \
+             patch.object(app, 'load_config_and_session', return_value=(object(), session)), \
+             patch.object(app, 'AiCourseManager', return_value=object()), \
+             patch.object(app, 'ai_progress', return_value=detail):
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                status = app.verify_one('ai', '70', '4')
+        self.assertEqual(status, 0, output.getvalue())
+        self.assertTrue(session.closed)
+        updated = app.read_cache(app.PROGRESS)
+        self.assertFalse(updated['incomplete'])
+        self.assertEqual(updated['failedCourses'], [])
+        self.assertEqual(updated['failedCourseDetails'], [])
+        self.assertFalse(updated['courses'][0]['stale'])
+
+    def test_one_course_does_not_erase_other_source_failures(self):
+        course = {'courseType': 'ai', 'courseId': 70, 'classId': 4, 'name': 'Examined'}
+        app.update_cache(app.COURSES, lambda _: {'courses': [course]}, self.fp)
+        app.update_cache(app.PROGRESS, lambda _: {
+            'courses': [{**course, 'stale': True}],
+            'incomplete': True,
+            'failedSources': ['共享课'],
+            'failedSourceDetails': [{'source': '共享课', 'code': 'NETWORK'}],
+            'failedCourses': ['Examined'],
+            'failedCourseDetails': [{'source': '单课进度', 'code': 'TIMEOUT'}],
+        }, self.fp)
+        session = FakeSession()
+        with patch.object(app.os, 'chdir'), \
+             patch.object(app, 'load_config_and_session', return_value=(object(), session)), \
+             patch.object(app, 'AiCourseManager', return_value=object()), \
+             patch.object(app, 'ai_progress', return_value={**course, 'stale': False}):
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                status = app.verify_one('ai', '70', '4')
+        self.assertEqual(status, 0, output.getvalue())
+        updated = app.read_cache(app.PROGRESS)
+        self.assertTrue(updated['incomplete'])
+        self.assertEqual(updated['failedSources'], ['共享课'])
+        self.assertEqual(updated['failedSourceDetails'][0]['code'], 'NETWORK')
+        self.assertEqual(updated['failedCourses'], [])
+
+    def test_verify_bootstrap_exception_is_redacted_and_leaves_cache_untouched(self):
+        course = {'courseType': 'ai', 'courseId': 70, 'classId': 4, 'name': 'Examined'}
+        app.update_cache(app.COURSES, lambda _: {'courses': [course]}, self.fp)
+        with patch.object(app.os, 'chdir'), \
+             patch.object(app, 'load_config_and_session',
+                          side_effect=RuntimeError('private-token-test-dont-print')):
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                status = app.verify_one('ai', '70', '4')
+        self.assertEqual(status, 1)
+        self.assertNotIn('private-token-test-dont-print', output.getvalue())
+        self.assertEqual(app.read_cache(app.PROGRESS), {})
+
     def test_gui_marks_stale_and_excludes_it_from_dashboard(self):
         ps1 = (Path(__file__).parent / 'payload/Zhidao-GUI.ps1').read_text(encoding='utf-8-sig')
         self.assertIn('if ($c.stale) { $cachedRows++; continue }', ps1)
-        self.assertIn('历史缓存未计入汇总', ps1)
+        self.assertIn('同步不完整；总进度暂不汇总', ps1)
+        self.assertIn('(-not $script:progressIncomplete)', ps1)
+        self.assertIn('历史记录：完成状态待核验', ps1)
         self.assertIn('课程接口返回空列表', ps1)
         self.assertIn('历史缓存，尚未重新核验', ps1)
 
