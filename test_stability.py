@@ -28,7 +28,7 @@ assert "DisplayVersion -Value '5.2.8'" in installer
 assert 'Zhidao Assistant V5.2.8' in installer
 assert installer.count('& $uv venv --python $pythonSource $venv') == 1
 build = (ROOT / 'build.py').read_text(encoding='utf-8')
-assert 'ZhidaoAssistant-Setup-v5.2.8-hotfix9-zhs-reliability.exe' in build
+assert 'ZhidaoAssistant-Setup-v5.2.8-hotfix10-login-diagnostics.exe' in build
 
 go_installer = (ROOT / 'src' / 'installer.go').read_text(encoding='utf-8')
 assert 'V5.2.8' in go_installer
