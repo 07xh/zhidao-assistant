@@ -199,7 +199,116 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'ZHS init failed.' }
     }
 } finally { Pop-Location }
-$files = @('ZhidaoAssistant.exe','Zhidao-GUI.ps1','Zhidao-UI.xaml','Consent-UI.xaml','Zhidao-Task.cmd','zhidao_only.py','Uninstall.ps1','使用条款与第三方声明.txt','隐私政策与数据说明.txt','LICENSE-GPL-3.0.txt','SOURCE.md','README-使用说明.txt','Official-Player.ps1','Official-MediaController.js','Install-WebView2.ps1','Verify-Environment.py','Windows-Preflight.ps1','AppLifecycle.ps1','Patch-ZHS-0.1.5.py','verify_and_integrate_v4.py','apply_safe_fixes_v2.py','apply_http_safety_v3.py')
+# A single allowlist is shared by build.py and the installed app; no duplicate list.
+$manifestFile = Join-Path $sourceDir 'install-files.json'
+$files = @(Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json)
+if ($files.Count -lt 2 -or $files -notcontains 'ZhidaoAssistant.exe' -or
+    $files -notcontains 'install-files.json') { throw 'Invalid installer resource manifest.' }
+$seenNames = @{}
+foreach ($name in $files) {
+    if ($name -isnot [string] -or -not $name -or
+        $name -eq '.' -or $name -eq '..' -or
+        $name -notmatch '^[^\\/:*?"<>|]+
+# Validate every payload file before modifying the previous installation.
+# The Python/ZHS virtual environment and shared ~/.zhs user data are never staged/removed here.
+$stageDir = Join-Path $env:TEMP ('zhidao-app-stage-' + [Guid]::NewGuid().ToString('N'))
+$backupDir = Join-Path $env:TEMP ('zhidao-app-backup-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $stageDir,$backupDir -Force | Out-Null
+$applied = New-Object System.Collections.Generic.List[string]
+$rollbackFailed = $false
+try {
+    foreach ($name in $files) {
+        $src = Join-Path $sourceDir $name
+        $staged = Join-Path $stageDir $name
+        if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { throw "Missing setup file: $name" }
+        Copy-Item -LiteralPath $src -Destination $staged -Force -ErrorAction Stop
+        if ((Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash) {
+            throw "Staging integrity failure: $name"
+        }
+        $existing = Join-Path $root $name
+        if (Test-Path -LiteralPath $existing -PathType Leaf) {
+            Copy-Item -LiteralPath $existing -Destination (Join-Path $backupDir $name) -Force -ErrorAction Stop
+        }
+    }
+    foreach ($name in $files) {
+        $dest = Join-Path $root $name
+        if ($name -eq 'ZhidaoAssistant.exe') { Assert-LauncherAvailable }
+        # Append BEFORE copy so a partial copy is included in rollback.
+        [void]$applied.Add($name)
+        Copy-Item -LiteralPath (Join-Path $stageDir $name) -Destination $dest -Force -ErrorAction Stop
+        if ((Get-FileHash -LiteralPath (Join-Path $stageDir $name) -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash) {
+            throw "Installed file integrity mismatch: $name"
+        }
+    }
+} catch {
+    $cause = $_
+    for ($i = $applied.Count - 1; $i -ge 0; $i--) {
+        $name = $applied[$i]
+        $prior = Join-Path $backupDir $name
+        $dest = Join-Path $root $name
+        try {
+            if (Test-Path -LiteralPath $prior -PathType Leaf) {
+                Copy-Item -LiteralPath $prior -Destination $dest -Force -ErrorAction Stop
+            } elseif (Test-Path -LiteralPath $dest -PathType Leaf) {
+                Remove-Item -LiteralPath $dest -Force -ErrorAction Stop
+            }
+        } catch {
+            $rollbackFailed = $true
+            Write-Warning "Could not restore application file: $name"
+        }
+    }
+    if ($rollbackFailed) {
+        Write-Warning ('Rollback not fully successful; recover files from ' + $backupDir)
+    }
+    throw $cause
+} finally {
+    Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue
+    if (-not $rollbackFailed) { Remove-Item -LiteralPath $backupDir -Recurse -Force -ErrorAction SilentlyContinue }
+}
+# Player dependencies are optional: lack of NuGet access triggers an explicit external browser fallback.
+try {
+    & (Join-Path $root 'Install-WebView2.ps1')
+} catch {
+    Write-Warning ('WebView2 SDK installation failed; official browser fallback remains available. ' + $_.Exception.Message)
+}
+# Remove only known obsolete application launchers from prior in-place versions.
+# The currently installed application files were replaced with rollback above.
+# Retain .venv, uv.exe, cookies, cache, and any unknown user-owned files.
+foreach ($oldName in @('ZHS-CLI.cmd','ZHS-GUI.ps1')) {
+    $legacy = Join-Path $root $oldName
+    if (Test-Path -LiteralPath $legacy) { Remove-Item -LiteralPath $legacy -Force }
+}
+$desktop = [Environment]::GetFolderPath('Desktop')
+$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop '知到学习助手.lnk'))
+$shortcut.TargetPath = Join-Path $root 'ZhidaoAssistant.exe'
+$shortcut.Arguments = ''
+$shortcut.WorkingDirectory = $env:USERPROFILE
+$shortcut.Description = '知到 App 官方 WebView2 播放工具 V5.2.8（WPF）'
+$shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,70"
+$shortcut.Save()
+# Register per-user uninstall entry in Windows Apps & Features (no administrator rights).
+$regKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\ZhidaoAssistant'
+New-Item -Path $regKey -Force | Out-Null
+New-ItemProperty -Path $regKey -Name DisplayName -Value '知到学习助手' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $regKey -Name DisplayVersion -Value '5.2.8' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $regKey -Name Publisher -Value 'Zhidao Assistant community (unofficial)' -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $regKey -Name InstallLocation -Value $root -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $regKey -Name DisplayIcon -Value (Join-Path $root 'ZhidaoAssistant.exe') -PropertyType String -Force | Out-Null
+$uninstallLine = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $root 'Uninstall.ps1') + '"'
+New-ItemProperty -Path $regKey -Name UninstallString -Value $uninstallLine -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $regKey -Name NoModify -Value 1 -PropertyType DWord -Force | Out-Null
+New-ItemProperty -Path $regKey -Name NoRepair -Value 1 -PropertyType DWord -Force | Out-Null
+Write-Host 'SUCCESS. Desktop shortcut: 知到学习助手 V5.2.8 (Windows test build)' -ForegroundColor Green
+Write-Host 'ZHS data directory:' (Join-Path $env:USERPROFILE '.zhs')
+Write-Host 'Login cookies stay in %USERPROFILE%\.zhs. The new privacy notice must be accepted at first launch.'
+ -or $seenNames.ContainsKey($name)) {
+        throw 'Invalid or duplicated installer resource name.'
+    }
+    $seenNames[$name] = $true
+}
+
 # Validate every payload file before modifying the previous installation.
 # The Python/ZHS virtual environment and shared ~/.zhs user data are never staged/removed here.
 $stageDir = Join-Path $env:TEMP ('zhidao-app-stage-' + [Guid]::NewGuid().ToString('N'))
