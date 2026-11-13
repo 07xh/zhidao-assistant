@@ -28,11 +28,11 @@ class CourseModelTests(unittest.TestCase):
         self.assertNotIn("opaque-private-route", marker)
 
     def test_learning_url_only_uses_known_origins(self):
-        course = {"courseType": "shared", "recruitAndCourseId": "a/b?c=d", "name": "课程"}
+        course = {"courseType": "shared", "recruitAndCourseId": "a/b+c=d", "name": "课程"}
         url = model.official_learning_url(course)
         self.assertTrue(url.startswith("https://studyvideoh5.zhihuishu.com/stuStudy?"))
-        self.assertIn("a%2Fb%3Fc%3Dd", url)
-        bad = {**course, "recruitAndCourseId": "http://evil.invalid/redirect"}
+        self.assertIn("a%2Fb%2Bc%3Dd", url)
+        bad = {**course, "recruitAndCourseId": "https://evil.invalid/?redirect=1"}
         self.assertEqual(model.official_learning_url(bad), "https://www.zhihuishu.com/")
         ai = {"courseType": "ai", "courseId": 45, "classId": 2}
         self.assertTrue(model.official_learning_url(ai).startswith(
