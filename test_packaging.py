@@ -65,7 +65,7 @@ class InstallerPackagingTests(unittest.TestCase):
             payload.mkdir()
             declared = self.prepare_fixture(payload)
             launcher = root / "ZhidaoAssistant.exe"
-            launcher.write_bytes(b"MZ\\x00example launcher (offline fake)".replace(b"\\x00", b"\x00"))
+            launcher.write_bytes(bytes([77, 90, 0]) + b"offline fake launcher")
             first, second = root / "first.zip", root / "second.zip"
             names = bundle_payload(payload, launcher, first)
             self.assertEqual(names, sorted(set(declared) | {INSTALLER_SCRIPT}))
