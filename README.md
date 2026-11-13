@@ -1,5 +1,7 @@
 # 知到学习助手 V5.2.8 Hotfix10（Windows x64 测试版）
 
+**开发分支最新修复（尚未进入 Hotfix10 Release）：** 单课只读核验成功后，准确更新对应的失败标记；其他失败来源继续保留；首页在同步不完整或存在历史记录时隐藏总进度统计；历史完成状态显示为待核验。增加了异常脱敏和针对性离线测试。这些修改不涉及 ZHS 心跳生成/发送算法。可在 [GitHub Actions](https://github.com/07xh/zhidao-assistant/actions/workflows/ci.yml) 核对最新源码构建情况。最新可直接下载的 Release 仍为 Hotfix10，**并未包含这批开发分支修复**。
+
 **最新登录检测修复：** 扫码后自动进行只读服务端诊断；明确区分本地 Cookie 缺失/损坏、会话未确认与课程接口失败；最近一次登录验证状态随 Cookie 更换立即失效。详见 [Hotfix10 更新说明](CHANGELOG-HOTFIX10.md)。
 
 
