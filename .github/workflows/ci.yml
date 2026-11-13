@@ -1,0 +1,74 @@
+name: Zhidao Assistant regression and Windows syntax
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'payload/**'
+      - 'src/**'
+      - 'research/**'
+      - 'test_*.py'
+      - 'test_*.cjs'
+      - 'build.py'
+      - '.github/workflows/ci.yml'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Offline tests and Windows x64 build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: 'payload:research:.'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.2'
+      - name: Install test dependencies
+        run: python -m pip install 'httpx==0.28.1'
+      - name: Run regression suite
+        run: |
+          python -m unittest discover -v -p 'test_*.py'
+          python -m unittest -v research.test_heartbeat_lab
+          node test_media_controller.cjs
+          python test_stability.py
+          python test_cmd_encoding.py
+          python test_ps1_encoding.py
+          python test_lifecycle_v528.py
+      - name: Cross-compile installer and inspect PE header
+        run: |
+          python build.py
+          file ZhidaoAssistant-Setup-v5.2.8-hotfix9-zhs-reliability.exe
+          file ZhidaoAssistant-Setup-v5.2.8-hotfix9-zhs-reliability.exe | grep -q PE32
+
+  windows-syntax:
+    name: Windows PowerShell 5.1 source parse
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse all PowerShell scripts without executing them
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem -Path payload -Filter '*.ps1' -File | ForEach-Object {
+            $tokens = $null
+            $parseErrors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parseErrors)
+            if ($parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell parser failed: $($_.Name)"
+            }
+            Write-Host "Parsed $($_.Name)"
+          }
