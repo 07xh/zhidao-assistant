@@ -1,4 +1,4 @@
-# 知到学习助手 V5.2.8 · 官方 WebView2 播放 + 双模式读取。
+﻿# 知到学习助手 V5.2.8 · 官方 WebView2 播放 + 双模式读取。
 # 保留 ZHS 0.1.5 的登录和 V3 的 zhidao_only.py 数据读取适配器。
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework

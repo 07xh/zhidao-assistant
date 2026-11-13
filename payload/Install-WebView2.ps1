@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+﻿# SPDX-License-Identifier: GPL-3.0-only
 # Installs Microsoft WebView2 WPF SDK assemblies from a pinned official NuGet package.
 # The WebView2 Runtime itself is supplied/updated by Microsoft on Windows.
 $ErrorActionPreference = 'Stop'

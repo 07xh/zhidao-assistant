@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+﻿# SPDX-License-Identifier: GPL-3.0-only
 # Same-user app-owned process discovery for safe upgrade / uninstall.
 # Do not match merely by process name (powershell/python/cmd may belong to other apps).
 

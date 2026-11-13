@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+﻿# SPDX-License-Identifier: GPL-3.0-only
 # Official Zhidao learning page WebView2 host. Does not implement/watch/report fake heartbeats.
 param(
     [ValidateSet('ai','shared')][string]$CourseType = 'ai',

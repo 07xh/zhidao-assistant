@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'Continue'
 # Download progress must remain visible on first-time installs.
 $env:UV_HTTP_TIMEOUT = '90'

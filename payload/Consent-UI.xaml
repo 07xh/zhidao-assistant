@@ -1,4 +1,4 @@
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="首次使用 · 隐私与第三方声明" Width="780" Height="660" MinHeight="560" MinWidth="650" WindowStartupLocation="CenterScreen" Background="#F5F7FB" FontFamily="Microsoft YaHei UI" FontSize="13" Foreground="#17263D" ResizeMode="CanResize">
+﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="首次使用 · 隐私与第三方声明" Width="780" Height="660" MinHeight="560" MinWidth="650" WindowStartupLocation="CenterScreen" Background="#F5F7FB" FontFamily="Microsoft YaHei UI" FontSize="13" Foreground="#17263D" ResizeMode="CanResize">
 <Grid Margin="28"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <TextBlock Text="欢迎使用知到学习助手" FontWeight="Bold" FontSize="24"/>
   <TextBlock Grid.Row="1" Text="非官方第三方软件 · 仅查看本人知到 App 中的共享课及智慧课程数据。请阅读以下说明后自行选择。" TextWrapping="Wrap" Margin="0,12,0,20" Foreground="#60748B"/>

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+﻿# SPDX-License-Identifier: GPL-3.0-only
 # Safe application-only uninstall. The shared .zhs directory belongs to ZHS itself.
 param([switch]$RemoveZhsData)
 $ErrorActionPreference = 'Stop'
