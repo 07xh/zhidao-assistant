@@ -472,9 +472,13 @@ def verify_one(course_type: str, course_id: str, class_id: str = "") -> int:
         print("[AUTH] 尚未扫码登录。请先登录再核验课程。")
         return 3
     os.chdir(Path.home())
-    loaded = load_config_and_session(debug=False, console_log=False, proxy=None)
+    try:
+        loaded = load_config_and_session(debug=False, console_log=False, proxy=None)
+    except Exception as exc:
+        emit_failure("单课会话", exc)
+        return 1
     if loaded is None:
-        print("[AUTH] 登录会话无效；旧进度未改变")
+        print("[AUTH_OR_NETWORK] 登录状态未获服务器确认；可能是登录过期或网络异常，旧进度未改变")
         return 1
     _, session = loaded
     try:
@@ -507,11 +511,33 @@ def verify_one(course_type: str, course_id: str, class_id: str = "") -> int:
             rows = [r for r in previous if isinstance(r, dict) and r.get("courseType") in ("ai", "shared")
                     and identity(r) != identity(selected)]
             rows.append(detail)
+            # Preserve source-wide failures: verifying one course does not prove
+            # that the entire source directory or other courses are now healthy.
+            source_errors = old.get("failedSources") if isinstance(old.get("failedSources"), list) else []
+            empty_sources = old.get("unconfirmedEmptySources") if isinstance(old.get("unconfirmedEmptySources"), list) else []
+            names = old.get("failedCourses") if isinstance(old.get("failedCourses"), list) else []
+            details = old.get("failedCourseDetails") if isinstance(old.get("failedCourseDetails"), list) else []
+            remaining_names = []
+            remaining_details = []
+            for index, name in enumerate(names):
+                if name == selected.get("name"):
+                    continue
+                remaining_names.append(name)
+                if index < len(details):
+                    remaining_details.append(details[index])
+            # Old caches can have unstructured error markers. Unknown errors
+            # remain incomplete until a full, successful read-only sync.
+            unexplained = bool(old.get("incomplete")) and not (
+                source_errors or empty_sources or names or any(r.get("stale") for r in previous))
+            incomplete = bool(source_errors or empty_sources or remaining_names
+                              or any(r.get("stale") for r in rows) or unexplained)
             return {"fetchedAt": datetime.now(timezone.utc).isoformat(),
-                    "courses": rows, "incomplete": bool(old.get("incomplete", False)),
-                    "failedSources": old.get("failedSources", []),
-                    "unconfirmedEmptySources": old.get("unconfirmedEmptySources", []),
-                    "failedCourses": [x for x in old.get("failedCourses", []) if x != selected.get("name")]}
+                    "courses": rows, "incomplete": incomplete,
+                    "failedSources": source_errors,
+                    "failedSourceDetails": old.get("failedSourceDetails", []),
+                    "unconfirmedEmptySources": empty_sources,
+                    "failedCourses": remaining_names,
+                    "failedCourseDetails": remaining_details}
         update_cache(PROGRESS, updated, fp)
         print("[VERIFIED] 已从服务器重新读取选定课程状态；本地播放时间不等于官方完成证明")
         return 0
