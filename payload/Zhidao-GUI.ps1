@@ -22,6 +22,7 @@ $script:activeTaskProcess = $null
 $script:activeTaskAction = ''
 $script:courses = @()
 $script:progressCourses = @()
+$script:progressIncomplete = $false
 $script:selectedCourseIndex = -1
 $script:previousSignature = ''
 $script:window = $null
@@ -231,7 +232,13 @@ function Check-TaskExit {
                 default { '连接诊断未完成（退出码 '+$code+'）。请检查命令窗口。' }
             }
         } elseif ($code -eq 0) {
-            (Control 'SyncMessageText').Text = if ($action -eq 'courses') { '课程同步已结束。界面会刷新最新课程列表。' } else { '进度同步已结束。以服务器返回的记录为准。' }
+            (Control 'SyncMessageText').Text = if ($action -eq 'courses') {
+                '课程列表只读同步已结束；请以服务器返回的数据为准。'
+            } else {
+                '进度只读同步已结束；仅展示已读取的服务器记录，不代表本地任务完成课程。'
+            }
+        } elseif ($code -eq 1 -and $action -in @('courses','progress')) {
+            (Control 'SyncMessageText').Text = '只读同步不完整：部分课程来源或记录未核验成功；保留历史数据，不应据此判断完成或清空。'
         } elseif ($code -eq 3) {
             (Control 'SyncMessageText').Text = '当前没有本机登录凭证，请先扫码登录。'
         } else {
@@ -663,7 +670,9 @@ function Select-Course([int]$index) {
         $row.Child = $info
         $vname = Add-Text $info ([string]$video.name) 13 '#192A42' $true
         $vname.Margin = [System.Windows.Thickness]::new(0,0,0,6)
-        $status = if ($video.serverCompleted) { '服务器已完成' } else { '未完成 / 未确认' }
+        $status = if ($progress.stale -or $course.stale) {
+            '历史记录：完成状态待核验'
+        } elseif ($video.serverCompleted) { '上次服务器记录已完成' } else { '未完成 / 未确认' }
         $desc = $status + '  ·  已记录 ' + [string]$video.studiedSeconds + ' 秒 / 总 ' + [string]$video.durationSeconds + ' 秒'
         [void](Add-Text $info $desc 11 '#74869D')
         [void]$p.Children.Add($row)
@@ -681,7 +690,8 @@ function Render-Data {
         if ($c.courseType -eq 'ai') { $finished += [int]$c.fullProgressPoints; $total += [int]$c.knowledgePointCount }
         elseif ($c.courseType -eq 'shared') { $finished += [int]$c.completedVideos; $total += [int]$c.videoCount }
     }
-    $showCounts = $script:hasProgress -and ($confirmedRows -gt 0 -or $script:progressCourses.Count -eq 0)
+    # A partial sync is useful for per-course inspection, not complete totals.
+    $showCounts = $script:hasProgress -and (-not $script:progressIncomplete) -and ($cachedRows -eq 0) -and ($confirmedRows -gt 0 -or $script:progressCourses.Count -eq 0)
     (Control 'CompletedCountText').Text = if ($showCounts) { [string]$finished } else { '—' }
     (Control 'PendingCountText').Text = if ($showCounts) { [string]([Math]::Max(0,$total-$finished)) } else { '—' }
     (Control 'CourseSyncTimeText').Text = if ($script:hasCourses) { '课程同步：' + (Format-Time $script:coursesTimestamp) } else { '尚无课程缓存' }
@@ -718,7 +728,10 @@ function Render-Data {
     }
     if ($script:hasProgress) {
         (Control 'BottomStatusText').Text = 'V5.2.8 · 最近一次同步的进度：' + (Format-Time $script:progressTimestamp) + ' · 非官方双模式工具'
-        if ($cachedRows -gt 0) { (Control 'BottomStatusText').Text += ' · ' + $cachedRows + ' 门历史缓存未计入汇总' }
+        if ($script:progressIncomplete -or $cachedRows -gt 0) {
+            (Control 'BottomStatusText').Text += ' · 同步不完整；总进度暂不汇总'
+            if ($cachedRows -gt 0) { (Control 'BottomStatusText').Text += ' · ' + $cachedRows + ' 门历史记录待核验' }
+        }
     } else {
         (Control 'BottomStatusText').Text = 'V5.2.8 · 尚无进度缓存 · 非官方知到 App 工具'
     }
@@ -731,7 +744,7 @@ function Refresh-Cache([switch]$Force) {
     $signature = Get-CacheSignature
     if (-not $Force -and $signature -eq $script:previousSignature) { return }
     $script:previousSignature = $signature
-    $script:courses = @(); $script:progressCourses = @(); $script:hasCourses = $false; $script:hasProgress = $false
+    $script:courses = @(); $script:progressCourses = @(); $script:hasCourses = $false; $script:hasProgress = $false; $script:progressIncomplete = $false
     $script:coursesTimestamp = ''; $script:progressTimestamp = ''
     $currentFingerprint = Get-SessionFingerprint
     if (-not $currentFingerprint -and (Test-Path -LiteralPath $script:coursesPath)) {
@@ -761,6 +774,7 @@ function Refresh-Cache([switch]$Force) {
             if ($data.source -eq 'zhidao' -and $currentFingerprint -and [string]$data.sessionFingerprint -ceq $currentFingerprint) {
                 $script:progressCourses = @(@($data.courses) | Where-Object { $null -ne $_ })
                 $script:hasProgress = $true
+                $script:progressIncomplete = [bool]$data.incomplete
                 $script:progressTimestamp = [string]$data.fetchedAt
                 if ($data.incomplete) { (Control 'SyncMessageText').Text = '进度核验尚未完整完成；部分内容可能来自历史缓存，请检查同步窗口。' }
             }
