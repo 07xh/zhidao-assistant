@@ -18,6 +18,15 @@
 
 **同步可靠性追加修复：** `zhidao_only.py` 的失败课程记录不再只依赖课程名称，改用不暴露原始课程路由的 SHA-256 身份摘要 `failedCourseKeys` 对齐失败原因；同名课程可独立恢复。老缓存缺少身份摘要且名称重复时保持未确认，不会误删错误。`test_sync_integrity.py` 新增同名课程与旧缓存回归用例。该字段对原缓存结构为向后兼容的可选字段。
 
+## 第二阶段：渐进式模块拆分（已完成代码与离线测试）
+
+- **登录状态模块：** 新增 `payload/SessionState.ps1`，从 WPF 主入口抽离 Cookie 摘要与登录提示状态机，仍保持原来的 `Get-CookieDigest`、`Update-LoginState` 调用接口。GUI 使用 dot-source 加载；`test_session_state.ps1` 在 Windows PowerShell 5.1 下用临时假 Cookie 实际检查：未登录、仅有凭证、已核验、账号更换、退出登录。
+- **诊断模块：** 新增 `payload/zhidao_diagnostics.py`，将 `ResponseShapeError`、`diagnose`、`diagnostic`、`emit_failure` 独立出来并由旧适配器重新导出。诊断仅打印允许的错误类别与固定建议，不打印异常原文；`test_diagnostics.py` 校验分类与脱敏。
+- **课程模型模块：** 新增 `payload/zhidao_courses.py`，抽离课程身份、身份摘要、固定官方域名链接及“空响应保留历史待确认”合并策略。原 `zhidao_only.py` 继续重新导出原接口；`test_course_model.py` 对比调用兼容性、同名课程不同身份、外部 URL 注入防护和缓存合并结果。
+- **安装一致性：** 三个模块全部进入唯一白名单 `install-files.json`，依赖随开发版 Windows 安装器一同打包；单独脚本测试与完整回归均由 GitHub Actions 执行。
+
+**边界：** 上述是离线重构与可用性改进，尚未证明真实 Windows 登录、浏览器播放、知到后台进度的端到端行为。不会将构建成功等同于平台学习完成。
+
 ## 二、暂不能直接删除的旧文件
 
 | 文件或目录 | 判定 | 理由 |
@@ -32,10 +41,10 @@
 
 ## 三、进一步架构重构（尚未完成）
 
-1. **P1｜GUI 拆分**：`payload/Zhidao-GUI.ps1` 约 900 行，集成登录状态、缓存、任务进程和 UI。建议按 `SessionState` / `TaskRunner` / `CourseViews` 拆分，但需维护 PowerShell 5.1 BOM、dot-source、`$script:` 作用域及 WPF 事件处理器绑定，先写 Windows Pester/组件测试，再分段迁移。
-2. **P1｜只读适配器拆分**：`payload/zhidao_only.py` 超过 700 行。候选边界为 `auth_state`、`cache_store`、`api_readers`、`sync_service`。先保持对外 CLI `doctor-server/courses/progress/verify-one` 契约和缓存 schema，避免账号缓存交叉污染。
+1. **P1｜GUI 继续拆分**：`SessionState.ps1` 已抽离并有 Windows 状态测试；余下 WPF 主入口仍约 880 行。下一步按 `TaskRunner` / `CourseViews` 拆分，先补运行时事件处理器与真实窗口测试，再分段迁移。
+2. **P1｜只读适配器继续拆分**：诊断与课程模型已抽离，`payload/zhidao_only.py` 仍约 640 行。下一步独立 `auth_state`、`cache_store`、`api_readers`、`sync_service`，保持对外 CLI `doctor-server/courses/progress/verify-one` 契约和缓存 schema，避免账号缓存交叉污染。
 3. **P1｜依赖锁定**：已固定 ZHS 0.1.5 / uv 版本，但尚未提供所有 Python 依赖的完整 hash lock；安装器首次联网安装依赖，仍有网络和供应链可重复性缺口。
-4. **P1｜Windows E2E 门禁**：目前 CI 仅完成 PowerShell AST 解析、离线测试、Windows 交叉编译。没有真实安装/升级/卸载、WebView2、扫码和 CAS 会话的真机验收。正式 Release 之前必须补齐。
+4. **P1｜Windows E2E 门禁**：目前 CI 增加了 Windows PowerShell 5.1 下的登录状态模块离线执行，但完整 Windows 安装/升级/卸载和真实服务器集成仍未验收。没有真实安装/升级/卸载、WebView2、扫码和 CAS 会话的真机验收。正式 Release 之前必须补齐。
 5. **P2｜GUI 提示一致性**：服务器只读记录、历史缓存和本地任务执行结果应始终分开展示；不可根据进程退出码推断课程完成。
 6. **P2｜测试整理**：早期 `test_hotfix3.py` / `test_hotfix4.py` / `test_stability.py` 有少量静态断言与运行时集成测试重叠；迁移为聚焦的单元测试后才能删旧用例。
 7. **P2｜版本单一来源**：`Install.ps1`, WPF 页面, Go 提示和预检仍存在 5.2.8 的重复文字；以后通过一次生成的构建元数据统一版本展示。
