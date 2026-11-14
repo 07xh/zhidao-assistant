@@ -13,7 +13,7 @@ function Read-ZhidaoCookieImport([string]$SourcePath) {
     catch { throw 'INVALID_JSON' }
     if ($rows.Count -lt 1 -or $rows.Count -gt 250) { throw 'COOKIE_COUNT' }
     $items = New-Object 'System.Collections.Generic.List[object]'
-    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    $seen = @{}
     foreach ($row in $rows) {
         if ($null -eq $row -or $row -isnot [pscustomobject]) { throw 'INVALID_ROW' }
         if ($null -eq $row.name -or $null -eq $row.value) { throw 'MISSING_FIELD' }
@@ -42,7 +42,8 @@ function Read-ZhidaoCookieImport([string]$SourcePath) {
             throw 'INVALID_PATH'
         }
         $key = $name + [char]0 + $domain + [char]0 + $path
-        if (-not $seen.Add($key)) { throw 'DUPLICATE_COOKIE' }
+        if ($seen.ContainsKey($key)) { throw 'DUPLICATE_COOKIE' }
+        $seen[$key] = $true
         $items.Add([ordered]@{ name = $name; value = $value; domain = $domain; path = $path })
     }
     return (ConvertTo-Json -InputObject $items.ToArray() -Compress -Depth 4)
