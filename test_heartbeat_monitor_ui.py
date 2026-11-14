@@ -62,8 +62,9 @@ class HeartbeatMonitorUIContracts(unittest.TestCase):
 
     def test_original_zhs_task_is_not_replaced(self):
         cmd = (ROOT / "payload/Zhidao-Task.cmd").read_text("utf-8")
-        self.assertEqual(cmd.count('"\%ZHS\%" play -c "\%~2:\%~3" --type ai'.replace("\\", "")), 0)
-        self.assertIn('"\%ZHS\%" play -c "\%~2:\%~3" --type ai'.replace("\\", ""), cmd)
+        call = '"%ZHS%" play -c "%~2:%~3" --type ai'
+        self.assertEqual(cmd.count(call), 1)
+
 
 
 if __name__ == "__main__":
