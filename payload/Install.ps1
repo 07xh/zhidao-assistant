@@ -5,6 +5,17 @@ $env:UV_HTTP_TIMEOUT = '90'
 $env:UV_HTTP_RETRIES = '2'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $sourceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Fail fast before touching the previous installation or downloading ZHS.
+# Do not use @(Get-Content ... | ConvertFrom-Json) on Windows PowerShell 5.1:
+# its array enumeration behavior can leave a nested array and false -notcontains.
+. (Join-Path $sourceDir 'InstallerManifest.ps1')
+$manifestFile = Join-Path $sourceDir 'install-files.json'
+$files = Read-ZhidaoInstallerManifest $manifestFile
+foreach ($name in $files) {
+    if (-not (Test-Path -LiteralPath (Join-Path $sourceDir $name) -PathType Leaf)) {
+        throw ('Installer resource missing before setup: ' + $name)
+    }
+}
 $root = Join-Path $env:LOCALAPPDATA 'ZHSDesktop'
 $venv = Join-Path $root '.venv'
 $uv = Join-Path $root 'uv.exe'
@@ -199,21 +210,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'ZHS init failed.' }
     }
 } finally { Pop-Location }
-# A single allowlist is shared by build.py and the installed app; no duplicate list.
-$manifestFile = Join-Path $sourceDir 'install-files.json'
-$files = @(Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json)
-if ($files.Count -lt 2 -or $files -notcontains 'ZhidaoAssistant.exe' -or
-    $files -notcontains 'install-files.json') { throw 'Invalid installer resource manifest.' }
-$seenNames = @{}
-$invalidNameChars = [System.IO.Path]::GetInvalidFileNameChars()
-foreach ($name in $files) {
-    if ($name -isnot [string]) { throw 'Invalid installer resource type.' }
-    if ([string]::IsNullOrWhiteSpace($name)) { throw 'Empty installer resource name.' }
-    if ($name -eq '.' -or $name -eq '..') { throw 'Invalid installer path.' }
-    if ($name.IndexOfAny($invalidNameChars) -ge 0) { throw 'Invalid installer path character.' }
-    if ($seenNames.ContainsKey($name)) { throw 'Duplicate installer resource name.' }
-    $seenNames[$name] = $true
-}
+# The manifest is parsed and every bundled resource was checked before setup.
+# Reuse that exact validated allowlist for staging and rollback.
 # Validate every payload file before modifying the previous installation.
 # The Python/ZHS virtual environment and shared ~/.zhs user data are never staged/removed here.
 $stageDir = Join-Path $env:TEMP ('zhidao-app-stage-' + [Guid]::NewGuid().ToString('N'))
