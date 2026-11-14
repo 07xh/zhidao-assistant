@@ -11,6 +11,7 @@ $sourceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $sourceDir 'InstallerManifest.ps1')
 $manifestFile = Join-Path $sourceDir 'install-files.json'
 $files = Read-ZhidaoInstallerManifest $manifestFile
+. (Join-Path $sourceDir 'LegacyCleanup.ps1')
 foreach ($name in $files) {
     if (-not (Test-Path -LiteralPath (Join-Path $sourceDir $name) -PathType Leaf)) {
         throw ('Installer resource missing before setup: ' + $name)
@@ -28,6 +29,12 @@ New-Item -ItemType Directory -Path $root -Force | Out-Null
 # Do not run an old Uninstall.ps1 here: it may remove login/runtime data or registry state.
 . (Join-Path $sourceDir 'AppLifecycle.ps1')
 Stop-ZhidaoAppProcesses -InstallRoot $root
+# Collect names BEFORE replacing the old package manifest. Only previously
+# packaged code files or exact legacy names can be scheduled for deletion.
+$retiredFiles = @(Get-ZhidaoRetiredFiles -InstallRoot $root -CurrentFiles $files)
+if ($retiredFiles.Count -gt 0) {
+    Write-Host ('[Upgrade] Retired application files found: ' + ($retiredFiles -join ', '))
+}
 function Assert-LauncherAvailable {
     $targetExe = Join-Path $root 'ZhidaoAssistant.exe'
     if (-not (Test-Path -LiteralPath $targetExe -PathType Leaf)) { return }
@@ -218,6 +225,7 @@ $stageDir = Join-Path $env:TEMP ('zhidao-app-stage-' + [Guid]::NewGuid().ToStrin
 $backupDir = Join-Path $env:TEMP ('zhidao-app-backup-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $stageDir,$backupDir -Force | Out-Null
 $applied = New-Object System.Collections.Generic.List[string]
+$pruned = New-Object System.Collections.Generic.List[string]
 $rollbackFailed = $false
 try {
     foreach ($name in $files) {
@@ -234,6 +242,17 @@ try {
             Copy-Item -LiteralPath $existing -Destination (Join-Path $backupDir $name) -Force -ErrorAction Stop
         }
     }
+    # Keep retired package files in the same rollback snapshot as the active
+    # application files. Only app-owned flat files, never .zhs or .venv.
+    foreach ($name in $retiredFiles) {
+        $legacy = Join-Path $root $name
+        if (-not (Test-ZhidaoOrdinaryFile $legacy)) { continue }
+        Copy-Item -LiteralPath $legacy -Destination (Join-Path $backupDir $name) -Force -ErrorAction Stop
+        if ((Get-FileHash -LiteralPath $legacy -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath (Join-Path $backupDir $name) -Algorithm SHA256).Hash) {
+            throw "Legacy backup integrity failure: $name"
+        }
+    }
     foreach ($name in $files) {
         $dest = Join-Path $root $name
         if ($name -eq 'ZhidaoAssistant.exe') { Assert-LauncherAvailable }
@@ -245,8 +264,30 @@ try {
             throw "Installed file integrity mismatch: $name"
         }
     }
+    foreach ($name in $retiredFiles) {
+        $legacy = Join-Path $root $name
+        if (-not (Test-ZhidaoOrdinaryFile $legacy)) { continue }
+        [void]$pruned.Add($name)
+        Remove-Item -LiteralPath $legacy -Force -ErrorAction Stop
+    }
 } catch {
     $cause = $_
+    # Restore deleted old-version files before restoring replaced app files.
+    for ($i = $pruned.Count - 1; $i -ge 0; $i--) {
+        $name = $pruned[$i]
+        $prior = Join-Path $backupDir $name
+        $dest = Join-Path $root $name
+        try {
+            Copy-Item -LiteralPath $prior -Destination $dest -Force -ErrorAction Stop
+            if ((Get-FileHash -LiteralPath $prior -Algorithm SHA256).Hash -ne
+                (Get-FileHash -LiteralPath $dest -Algorithm SHA256).Hash) {
+                throw "Legacy rollback integrity failure: $name"
+            }
+        } catch {
+            $rollbackFailed = $true
+            Write-Warning "Could not restore retired application file: $name"
+        }
+    }
     for ($i = $applied.Count - 1; $i -ge 0; $i--) {
         $name = $applied[$i]
         $prior = Join-Path $backupDir $name
@@ -276,12 +317,15 @@ try {
 } catch {
     Write-Warning ('WebView2 SDK installation failed; official browser fallback remains available. ' + $_.Exception.Message)
 }
-# Remove only known obsolete application launchers from prior in-place versions.
-# The currently installed application files were replaced with rollback above.
-# Retain .venv, uv.exe, cookies, cache, and any unknown user-owned files.
-foreach ($oldName in @('ZHS-CLI.cmd','ZHS-GUI.ps1')) {
-    $legacy = Join-Path $root $oldName
-    if (Test-Path -LiteralPath $legacy) { Remove-Item -LiteralPath $legacy -Force }
+# Remove only app-owned stale monitoring files after old application processes
+# are closed. Never delete the shared ZHS directory, venv, or user cache.
+try {
+    $removedSnapshots = Clear-ZhidaoStaleMonitorFiles -InstallRoot $root
+    if ($removedSnapshots) { Write-Host ('[Upgrade] Removed ' + $removedSnapshots + ' stale app monitor files.') }
+    [void](Clear-ZhidaoLegacyShortcuts -InstallRoot $root)
+    [void](Clear-ZhidaoLegacyRegistry -InstallRoot $root)
+} catch {
+    Write-Warning ('Old-version residual cleanup was incomplete: ' + $_.Exception.Message)
 }
 $desktop = [Environment]::GetFolderPath('Desktop')
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop '知到学习助手.lnk'))
@@ -306,3 +350,13 @@ New-ItemProperty -Path $regKey -Name NoRepair -Value 1 -PropertyType DWord -Forc
 Write-Host 'SUCCESS. Desktop shortcut: 知到学习助手 V5.2.9 Beta 2 (Windows test build)' -ForegroundColor Green
 Write-Host 'ZHS data directory:' (Join-Path $env:USERPROFILE '.zhs')
 Write-Host 'Login cookies stay in %USERPROFILE%\.zhs. The new privacy notice must be accepted at first launch.'
+# Last: clean stale temp extraction directories from previous installers.
+# Never remove the extraction directory of this running setup.
+try {
+    $cleaned = Clear-ZhidaoOldSetupTemp -TempRoot $env:TEMP -ActiveSetupDir $sourceDir -MinimumAgeHours 24
+    Write-Host ('[Upgrade] Cleaned old setup/temp items: ' + $cleaned + '.')
+} catch {
+    Write-Warning ('Safe cleanup of previous installer temp folders was incomplete: ' + $_.Exception.Message)
+}
+Write-Host '[Upgrade] Retired app files cleaned. Current account, course data and reusable Python runtime preserved.'
+
