@@ -69,7 +69,7 @@ class WpfVisualContractTests(unittest.TestCase):
         for name in ("NavButton", "PrimaryButton", "SecondaryButton",
                      "DangerButton", "CardStyle", "SectionTitle"):
             self.assertIn(name, resources)
-        self.assertIn('CornerRadius="18"', self.xml_text)
+        self.assertIn('<Setter Property="CornerRadius" Value="18"/>', self.xml_text)
         self.assertIn('Content="扫码登录"', self.xml_text)
 
 if __name__ == "__main__":
