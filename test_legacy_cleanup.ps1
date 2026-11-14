@@ -21,12 +21,15 @@ try {
     [IO.File]::WriteAllText((Join-Path $other 'ZHS-GUI.ps1'), 'other user application')
     $oldMonitor = Join-Path $root ('monitor-zhs-' + ('a' * 32) + '.json')
     $freshMonitor = Join-Path $root ('monitor-zhs-' + ('b' * 32) + '.json')
+    $oldQRStatus = Join-Path $root ('monitor-qr-' + ('c' * 32) + '.json')
     [IO.File]::WriteAllText($oldMonitor, '{}')
     [IO.File]::WriteAllText($freshMonitor, '{}')
+    [IO.File]::WriteAllText($oldQRStatus, '{}')
     (Get-Item $oldMonitor).LastWriteTimeUtc = [DateTime]::UtcNow.AddDays(-10)
+    (Get-Item $oldQRStatus).LastWriteTimeUtc = [DateTime]::UtcNow.AddDays(-10)
 
     $n = Remove-ZhidaoOldAppResidue -InstallRoot $root
-    if ($n -ne 3) { throw ('Wrong obsolete cleanup count: ' + $n) }
+    if ($n -ne 4) { throw ('Wrong obsolete cleanup count: ' + $n) }
     foreach ($file in @('ZHS-GUI.ps1','ZHS-CLI.cmd')) {
         if (Test-Path -LiteralPath (Join-Path $root $file)) { throw ('Obsolete file retained: ' + $file) }
     }
@@ -35,7 +38,7 @@ try {
             throw ('User data or runtime deleted during upgrade: ' + $file)
         }
     }
-    if (Test-Path $oldMonitor) { throw 'Expired monitor file was not cleaned' }
+    if (Test-Path $oldMonitor -or Test-Path $oldQRStatus) { throw 'Expired monitor or QR status file was not cleaned' }
     if (-not (Test-Path $freshMonitor)) { throw 'Fresh active monitor file was removed' }
     if (-not (Test-Path (Join-Path $other 'ZHS-GUI.ps1'))) { throw 'Different app was modified' }
 
