@@ -80,7 +80,7 @@ class QrLoginTests(unittest.TestCase):
         self.assertEqual(self.login(AuthStatus.OK), 0)
         self.assertEqual(json.loads((self.data / "cookies.json").read_text())[0]["value"], "SECRET_COOKIE")
         self.assertEqual(json.loads(self.obs.path.read_text())["stage"], "verified")
-        self.assertEqual((self.data / "qrcode.png").read_bytes(), b"valid fresh QR bytes")
+        self.assertFalse((self.data / "qrcode.png").exists(), "One-use QR image must be deleted after success")
         self.assertNotIn("SECRET_COOKIE", self.obs.path.read_text())
         self.assertIn("[QR_VERIFIED]", self.out.getvalue())
 
@@ -88,16 +88,19 @@ class QrLoginTests(unittest.TestCase):
         self.assertEqual(self.login(AuthStatus.EXPIRED), 7)
         self.assertEqual((self.data / "cookies.json").read_text(), "OLD_ACCOUNT_COOKIE")
         self.assertEqual(json.loads(self.obs.path.read_text())["stage"], "rejected")
+        self.assertFalse((self.data / "qrcode.png").exists(), "Failed CAS must also erase QR")
 
     def test_unavailable_saved_but_never_claimed_verified(self):
         self.assertEqual(self.login(AuthStatus.UNAVAILABLE), 4)
         self.assertEqual(json.loads(self.obs.path.read_text())["stage"], "unavailable")
+        self.assertFalse((self.data / "qrcode.png").exists(), "Unavailable CAS must erase QR")
         self.assertNotIn("[QR_VERIFIED]", self.out.getvalue())
         self.assertEqual(json.loads((self.data / "cookies.json").read_text())[0]["name"], "CASLOGC")
 
     def test_login_error_does_not_leak_sensitive_message_or_replace_cookie(self):
         self.assertEqual(self.login(AuthStatus.OK, raise_login="secret=QR_TOKEN_SHOULD_NOT_LEAK"), 5)
         self.assertEqual((self.data / "cookies.json").read_text(), "OLD_ACCOUNT_COOKIE")
+        self.assertFalse((self.data / "qrcode.png").exists(), "QR must be erased on error")
         self.assertNotIn("QR_TOKEN_SHOULD_NOT_LEAK", self.out.getvalue())
         self.assertNotIn("QR_TOKEN_SHOULD_NOT_LEAK", self.obs.path.read_text())
 
@@ -105,6 +108,19 @@ class QrLoginTests(unittest.TestCase):
         self.assertEqual(self.login(AuthStatus.EXPIRED, qr_writes=False), 7)
         self.assertFalse((self.data / "qrcode.png").is_file())
         self.assertEqual((self.data / "cookies.json").read_text(), "OLD_ACCOUNT_COOKIE")
+
+    def test_qr_deleted_on_cancellation_without_erasing_other_login_files(self):
+        (self.data / "config.toml").write_text("preserve=true", encoding="utf-8")
+        self.assertEqual(self.login(AuthStatus.OK, raise_login="用户取消登录"), 9)
+        self.assertFalse((self.data / "qrcode.png").exists())
+        self.assertEqual((self.data / "cookies.json").read_text(), "OLD_ACCOUNT_COOKIE")
+        self.assertEqual((self.data / "config.toml").read_text(), "preserve=true")
+
+    def test_cleanup_retries_are_only_exact_qr_filename(self):
+        self.assertEqual(self.login(AuthStatus.OK), 0)
+        self.assertEqual(self.login(AuthStatus.EXPIRED), 7)
+        self.assertFalse((self.data / "qrcode.png").exists())
+        self.assertTrue((self.data / "cookies.json").exists())
 
     def test_unsafe_telemetry_path_rejected(self):
         for token in ("../outside", "Z" * 32, "e" * 33):
@@ -123,6 +139,8 @@ class QrLoginTests(unittest.TestCase):
         self.assertIn("Show-ZhidaoQrDialog", gui)
         self.assertIn('x:Name="QrLoginStateText"', ui)
         self.assertNotIn("Start-Process -FilePath $script:qrPath", gui)
+        self.assertIn("Clear-ZhidaoQrImage $script:qrPath", gui)
+        self.assertIn("if ($script:activeTaskAction -eq 'login')", gui)
 
 
 if __name__ == "__main__":

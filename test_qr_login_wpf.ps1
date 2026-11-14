@@ -17,7 +17,9 @@ try {
     $script:activeQrToken = [Guid]::NewGuid().ToString('N')
     $script:lastQrStatus = ''
     $script:qrStartedAt = Get-Date
-    $script:qrPath = Join-Path $script:root 'qrcode.png'
+    $script:dataDir = Join-Path $script:root 'shared-zhs'
+    New-Item -Path $script:dataDir -ItemType Directory -Force | Out-Null
+    $script:qrPath = Join-Path $script:dataDir 'qrcode.png'
     $script:qrViewer = $null
     . (Join-Path $PSScriptRoot 'payload\QrLoginView.ps1')
     Update-ZhidaoQrView
@@ -56,7 +58,26 @@ try {
     if ((Control 'QrLoginStateText').Text -notmatch '认证服务器暂不可用') {
         throw 'Offline authentication incorrectly appeared verified'
     }
-    Write-Host 'QR login WPF stage labels and token/time isolation passed.'
+    # Login cancellation/completion may leave a QR PNG if the Python process
+    # is force-killed. WPF cleanup must remove ONLY the QR, not stored cookies.
+    $cookieFile = Join-Path $script:dataDir 'cookies.json'
+    $foreignFile = Join-Path $script:root 'qrcode.png'
+    [IO.File]::WriteAllText($cookieFile, 'PRESERVED_FAKE_COOKIE')
+    [IO.File]::WriteAllBytes($script:qrPath, [byte[]](1,2,3,4))
+    [IO.File]::WriteAllText($foreignFile, 'PRESERVED_FOREIGN_FILE')
+    if (Clear-ZhidaoQrImage $foreignFile) {
+        throw 'QR cleanup accepted a path outside the exact login QR location'
+    }
+    if (-not (Clear-ZhidaoQrImage $script:qrPath)) { throw 'Active QR image cleanup failed' }
+    if ((Test-Path -LiteralPath $script:qrPath) -or
+        -not (Test-Path -LiteralPath $cookieFile) -or
+        -not (Test-Path -LiteralPath $foreignFile)) {
+        throw 'QR cleanup erased cookies or unrelated files'
+    }
+    if (-not (Clear-ZhidaoQrImage $script:qrPath)) {
+        throw 'Repeated QR cleanup must be idempotent'
+    }
+    Write-Host 'QR login WPF lifecycle, exact image cleanup and token/time isolation passed.'
 } finally {
     Remove-Item -LiteralPath $script:root -Recurse -Force -ErrorAction SilentlyContinue
 }

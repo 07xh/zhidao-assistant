@@ -1,5 +1,23 @@
 ﻿# Read-only view of the app's sanitized QR login lifecycle.
 # All text is a fixed label; do not display QR tokens or upstream exceptions.
+# Delete only this application's one-use QR picture; never use wildcards.
+# This is also the GUI fallback if the Python QR child is force-terminated.
+function Clear-ZhidaoQrImage([string]$path) {
+    try {
+        $expected = [IO.Path]::GetFullPath((Join-Path $script:dataDir 'qrcode.png'))
+        $actual = [IO.Path]::GetFullPath($path)
+        if (-not [string]::Equals($actual, $expected, [StringComparison]::OrdinalIgnoreCase)) {
+            return $false
+        }
+        if (Test-Path -LiteralPath $actual -PathType Leaf) {
+            Remove-Item -LiteralPath $actual -Force -ErrorAction Stop
+        }
+        return (-not (Test-Path -LiteralPath $actual))
+    } catch {
+        return $false
+    }
+}
+
 function Get-ZhidaoQrObservation([string]$token) {
     if ($token -cnotmatch '^[0-9a-f]{32}$') { return $null }
     $file = Join-Path $script:root ('monitor-qr-' + $token + '.json')
