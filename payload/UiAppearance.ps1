@@ -198,9 +198,37 @@ function Update-UiLayout {
         $btn.Content = if ($compact) { $entry[1] } else { $entry[2] }
         $btn.ToolTip = $entry[2]
     }
+    # At high DPI the usable window width is measured in WPF device-independent pixels.
+    $small = $width -lt 760
+    (Control 'BtnLoginShortcut').Content = if ($small) { '账号' } else { '登录管理' }
+    (Control 'LoginStateText').MaxWidth = if ($small) { 135 } else { 220 }
+    $detail = Control 'PageDetail'
+    $courseList = Control 'DetailCourseListBorder'
+    $content = Control 'DetailContentBorder'
+    if ($small) {
+        # Keep the course picker visible above the details instead of clipping details.
+        $detail.ColumnDefinitions[0].Width = [System.Windows.GridLength]::new(0)
+        $detail.ColumnDefinitions[1].Width = [System.Windows.GridLength]::new(0)
+        $detail.RowDefinitions[0].Height = [System.Windows.GridLength]::new(118)
+        $detail.RowDefinitions[1].Height = [System.Windows.GridLength]::new(1,[System.Windows.GridUnitType]::Star)
+        [System.Windows.Controls.Grid]::SetRow($courseList,0)
+        [System.Windows.Controls.Grid]::SetColumn($courseList,2)
+        [System.Windows.Controls.Grid]::SetColumnSpan($courseList,1)
+        [System.Windows.Controls.Grid]::SetRow($content,1)
+        [System.Windows.Controls.Grid]::SetColumn($content,2)
+    } else {
+        $detail.ColumnDefinitions[0].Width = [System.Windows.GridLength]::new(230)
+        $detail.ColumnDefinitions[1].Width = [System.Windows.GridLength]::new(14)
+        $detail.RowDefinitions[0].Height = [System.Windows.GridLength]::new(1,[System.Windows.GridUnitType]::Star)
+        $detail.RowDefinitions[1].Height = [System.Windows.GridLength]::new(0)
+        [System.Windows.Controls.Grid]::SetRow($courseList,0)
+        [System.Windows.Controls.Grid]::SetColumn($courseList,0)
+        [System.Windows.Controls.Grid]::SetColumnSpan($courseList,1)
+        [System.Windows.Controls.Grid]::SetRow($content,0)
+        [System.Windows.Controls.Grid]::SetColumn($content,2)
+    }
     $cards = Control 'HomeCourseCards'
-    $available = [double]$cards.ActualWidth
-    if ($available -lt 1) { $available = [Math]::Max(300, $width - $sidebarWidth - 60) }
+    $available = [Math]::Max(300,$width - $sidebarWidth - 60)
     $columns = if ($available -ge 740) { 2 } else { 1 }
     $itemWidth = if ($columns -eq 2) { [Math]::Floor(($available - 30) / 2) } else { [Math]::Floor($available - 14) }
     foreach ($card in @($cards.Children)) {
