@@ -22,6 +22,7 @@ $script:activeTaskProcess = $null
 $script:activeTaskAction = ''
 $script:activeTaskCourse = $null
 $script:activeTaskSessionFingerprint = ''
+$script:activeTaskZhsToken = ''
 $script:courses = @()
 $script:progressCourses = @()
 $script:progressIncomplete = $false
@@ -289,6 +290,7 @@ function Check-TaskExit {
     $autoCheckAfterLogin = $false
     $finishedPlayCourse = $null
     $finishedPlayFingerprint = ''
+    $finishedZhsToken = $script:activeTaskZhsToken
     $importServerExitCode = $null
     $code = -1
     try {
@@ -356,6 +358,11 @@ function Check-TaskExit {
         $script:activeTaskAction = ''
         $script:activeTaskCourse = $null
         $script:activeTaskSessionFingerprint = ''
+        $script:activeTaskZhsToken = ''
+        if ($finishedZhsToken -match '^[0-9a-f]{32}$') {
+            $zhsSnapshotFile = Join-Path $script:root ('monitor-zhs-' + $finishedZhsToken + '.json')
+            Remove-Item -LiteralPath $zhsSnapshotFile -Force -ErrorAction SilentlyContinue
+        }
         $script:runningTasks = @()
     }
     if ($script:cookieImportActive) {
@@ -524,12 +531,16 @@ function Launch-Original-ZHS {
     try {
         $taskPath = Join-Path $script:root 'Zhidao-Task.cmd'
         # All passed parameters have been validated to be decimal-only IDs.
-        $proc = Start-Process -FilePath $taskPath -ArgumentList @('play-ai', $validated[1], $validated[2]) -WorkingDirectory $env:USERPROFILE -PassThru
+        $monitorToken = [Guid]::NewGuid().ToString('N')
+        $proc = Start-Process -FilePath $taskPath -ArgumentList @(
+            'play-ai', $validated[1], $validated[2], $monitorToken
+        ) -WorkingDirectory $env:USERPROFILE -PassThru
         $script:runningTasks = @($proc)
         $script:activeTaskProcess = $proc
         $script:activeTaskAction = 'play-ai'
         $script:activeTaskCourse = $c
         $script:activeTaskSessionFingerprint = $launchFingerprint
+        $script:activeTaskZhsToken = $monitorToken
         [void](Set-HeartbeatMonitorTask $c $launchFingerprint 'running' 'zhs-original')
         [void](Add-HeartbeatMonitorEvent $c $launchFingerprint 'zhs-start')
         (Control 'SyncMessageText').Text = 'ZHS 原版命令已启动。结束后将显示退出状态；这不代表服务器已确认学习进度。'

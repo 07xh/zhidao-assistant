@@ -74,11 +74,32 @@ try {
         (Control 'HeartbeatServerProgressBar').Value -ne 50) {
         throw 'Local observation / server record render failed'
     }
+    # Show observed ZHS segment percent, never the official course percent.
+    $zhsToken = [Guid]::NewGuid().ToString('N')
+    $zhsPath = Join-Path $script:root ('monitor-zhs-' + $zhsToken + '.json')
+    $zhsData = @{v=1;token=$zhsToken;videoSegmentPercent=48.5;
+        resourceIndex=2;resourceTotal=5;at=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()}
+    [IO.File]::WriteAllText($zhsPath, ($zhsData | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    $script:playMode = 'zhs-original'
+    $script:activeTaskProcess = [pscustomobject]@{Id=111}
+    $script:activeTaskAction = 'play-ai'
+    $script:activeTaskZhsToken = $zhsToken
+    $script:activeTaskSessionFingerprint = $script:fakeSession
+    $script:activeTaskCourse = $script:course
+    Update-HeartbeatPanel
+    if ((Control 'HeartbeatZhsPanel').Visibility -ne 'Visible' -or
+        (Control 'HeartbeatZhsProgressBar').Value -ne 48.5 -or
+        (Control 'HeartbeatZhsPercentText').Text -ne '48.5%' -or
+        (Control 'HeartbeatServerProgressBar').Value -ne 50 -or
+        (Control 'HeartbeatZhsResourceText').Text -notmatch '2/5') {
+        throw 'Original ZHS stdout simulated progress was not displayed separately'
+    }
     $script:course = [pscustomobject]@{courseType='ai';courseId='111';classId='210';stale=$false}
     Update-HeartbeatPanel
     if ((Control 'HeartbeatProgressLabel').Text -ne '—' -or
         (Control 'HeartbeatServerProgressBar').Value -ne 0 -or
-        (Control 'HeartbeatLocalProgressBar').Value -ne 0) {
+        (Control 'HeartbeatLocalProgressBar').Value -ne 0 -or
+        (Control 'HeartbeatZhsProgressBar').Value -ne 0) {
         throw 'Switching courses leaked progress'
     }
     Toggle-HeartbeatPanel

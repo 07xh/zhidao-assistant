@@ -13,6 +13,8 @@ function Update-HeartbeatPanel {
     $serverLabel = '—'
     $serverHint = '没有可确认的服务器进度'
     $serverPercent = 0
+    $zhsPercent = $null
+    $zhsResource = '尚未检测到原版资源进度'
 
     if ($key -and $fp) {
         if ($script:hmTask.key -ceq $key) {
@@ -34,6 +36,30 @@ function Update-HeartbeatPanel {
                 'ok' { '读取成功' }
                 'error' { '核验失败' }
                 default { '未核验' }
+            }
+        }
+        # Live local ZHS numbers are read from the original console output.
+        # These do NOT prove requests were accepted by the server.
+        if ($script:playMode -eq 'zhs-original') {
+            $commsLabel = '原版网络回执不可观测'
+            if ($null -ne $script:activeTaskProcess -and
+                $script:activeTaskAction -eq 'play-ai' -and
+                $script:activeTaskZhsToken -match '^[0-9a-f]{32}$' -and
+                $script:activeTaskSessionFingerprint -ceq $fp -and
+                (Get-HeartbeatCourseKey $script:activeTaskCourse) -ceq $key) {
+                $sample = Get-HeartbeatZhsSnapshot $script:activeTaskZhsToken
+                if ($null -ne $sample) {
+                    if ($null -ne $sample.percent) {
+                        $zhsPercent = [double]$sample.percent
+                    }
+                    if ($null -ne $sample.resourceIndex) {
+                        $zhsResource = '原版正在处理资源 ' + $sample.resourceIndex +
+                            '/' + $sample.resourceTotal + '（不是整课进度）'
+                    }
+                    $commsLabel = '片段进度可观测 · 上报结果未知'
+                } else {
+                    $zhsResource = '等待原版输出可解析的进度；不使用估算值'
+                }
             }
         }
         # Do not infer global course completion from local time or from an
@@ -106,6 +132,12 @@ function Update-HeartbeatPanel {
     (Control 'HeartbeatProgressLabel').Text = $serverLabel
     (Control 'HeartbeatProgressHint').Text = $serverHint
     (Control 'HeartbeatServerProgressBar').Value = [double]$serverPercent
+    (Control 'HeartbeatZhsPanel').Visibility = if ($script:playMode -eq 'zhs-original') { 'Visible' } else { 'Collapsed' }
+    (Control 'HeartbeatZhsPercentText').Text = if ($null -ne $zhsPercent) {
+        $zhsPercent.ToString('0.0', [System.Globalization.CultureInfo]::InvariantCulture) + '%'
+    } else { '—' }
+    (Control 'HeartbeatZhsProgressBar').Value = if ($null -ne $zhsPercent) { [double]$zhsPercent } else { 0 }
+    (Control 'HeartbeatZhsResourceText').Text = $zhsResource
     (Control 'HeartbeatLocalPlaybackText').Text = $localLabel
     (Control 'HeartbeatLocalProgressBar').Value = [double]$localPercent
 

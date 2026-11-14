@@ -65,6 +65,29 @@ try {
     $observation.event = 'forged-heartbeat-success'
     [IO.File]::WriteAllText($path, ($observation | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
     if ($null -ne (Get-HeartbeatLocalSnapshot $token)) { throw 'Untrusted playback status accepted' }
+    # ZHS original stdout observer is numeric-only and never counts as official progress.
+    $zhsToken = [Guid]::NewGuid().ToString('N')
+    $zhsPath = Join-Path $root ('monitor-zhs-' + $zhsToken + '.json')
+    $simulated = @{v=1;token=$zhsToken;videoSegmentPercent=48.5;
+        resourceIndex=2;resourceTotal=5;at=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()}
+    [IO.File]::WriteAllText($zhsPath, ($simulated | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    $zhsSnapshot = Get-HeartbeatZhsSnapshot $zhsToken
+    if ($null -eq $zhsSnapshot -or $zhsSnapshot.percent -ne 48.5 -or
+        $zhsSnapshot.resourceIndex -ne 2 -or $zhsSnapshot.resourceTotal -ne 5) {
+        throw 'Fresh simulated stdout metrics not accepted'
+    }
+    if ($null -ne (Get-HeartbeatZhsSnapshot ('f' * 32))) {
+        throw 'Unrelated ZHS token observed'
+    }
+    $simulated.at = [DateTimeOffset]::UtcNow.AddMinutes(-2).ToUnixTimeSeconds()
+    [IO.File]::WriteAllText($zhsPath, ($simulated | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    if ($null -ne (Get-HeartbeatZhsSnapshot $zhsToken)) { throw 'Expired ZHS metric observed as live' }
+    $simulated.at = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $simulated.videoSegmentPercent = 155
+    [IO.File]::WriteAllText($zhsPath, ($simulated | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    if ($null -ne (Get-HeartbeatZhsSnapshot $zhsToken)) {
+        throw 'Impossible simulated segment percent accepted'
+    }
     Write-Host 'Heartbeat monitor course/session isolation and local observations passed (offline).'
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue

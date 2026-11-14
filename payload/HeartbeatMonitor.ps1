@@ -122,3 +122,44 @@ function Get-HeartbeatLocalSnapshot([string]$token) {
         }
     } catch { return $null }
 }
+
+# Local original ZHS console progress only. The upstream 'playing' percentage
+# measures execution through the current simulated video segment. It cannot
+# establish study duration, heartbeat acceptance or server course completion.
+function Get-HeartbeatZhsSnapshot([string]$token) {
+    if ($token -notmatch '^[0-9a-f]{32}$') { return $null }
+    $path = Join-Path $script:root ('monitor-zhs-' + $token + '.json')
+    try {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+        $info = Get-Item -LiteralPath $path -ErrorAction Stop
+        if ($info.Length -lt 2 -or $info.Length -gt 2048) { return $null }
+        $item = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if ([int]$item.v -ne 1 -or [string]$item.token -cne $token) { return $null }
+        $seconds = [double]$item.at
+        if ([double]::IsNaN($seconds) -or [double]::IsInfinity($seconds)) { return $null }
+        $observedAt = [DateTimeOffset]::FromUnixTimeSeconds([long][Math]::Floor($seconds))
+        $age = ([DateTimeOffset]::UtcNow - $observedAt).TotalSeconds
+        if ($age -lt -10 -or $age -gt 18) { return $null }
+        $percent = $null
+        if ($null -ne $item.videoSegmentPercent) {
+            $percent = [double]$item.videoSegmentPercent
+            if ([double]::IsNaN($percent) -or [double]::IsInfinity($percent) -or
+                $percent -lt 0 -or $percent -gt 100) { return $null }
+        }
+        $resourceIndex = $null
+        $resourceTotal = $null
+        if ($null -ne $item.resourceIndex -or $null -ne $item.resourceTotal) {
+            if ($null -eq $item.resourceIndex -or $null -eq $item.resourceTotal) { return $null }
+            $resourceIndex = [int]$item.resourceIndex
+            $resourceTotal = [int]$item.resourceTotal
+            if ($resourceIndex -lt 1 -or $resourceTotal -lt $resourceIndex -or
+                $resourceTotal -gt 100000) { return $null }
+        }
+        if ($null -eq $percent -and $null -eq $resourceIndex) { return $null }
+        return [pscustomobject]@{
+            percent = $percent
+            resourceIndex = $resourceIndex
+            resourceTotal = $resourceTotal
+        }
+    } catch { return $null }
+}
