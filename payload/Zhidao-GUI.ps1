@@ -47,6 +47,9 @@ $script:pendingVerifySessionFingerprint = ''
 $script:pendingVerifyPath = Join-Path $script:root 'pending-verify.json'
 $script:verifyOutputPath = $null
 $script:verifyErrorPath = $null
+$script:verifyCourse = $null
+$script:verifySession = ''
+$script:playerMonitorToken = ''
 $script:loginProbeState = ''
 $script:loginProbeCookieDigest = ''
 $script:loginProbeCheckedAt = $null
@@ -128,6 +131,8 @@ function Any-TaskActive {
 # Session state is a separate, syntax-checked module loaded before task handlers.
 . (Join-Path $script:root 'SessionState.ps1')
 . (Join-Path $script:root 'CookieImport.ps1')
+. (Join-Path $script:root 'HeartbeatMonitor.ps1')
+Initialize-HeartbeatMonitor
 
 function Test-CookieImportAllowed {
     if (Any-TaskActive -or $null -ne $script:activeTaskProcess -or $script:cookieImportActive) {
