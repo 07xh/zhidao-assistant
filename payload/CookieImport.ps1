@@ -1,4 +1,4 @@
-# Import an existing ZHS 0.1.5 cookies.json from the current user's own account.
+﻿# Import an existing ZHS 0.1.5 cookies.json from the current user's own account.
 # Never log cookie values or send them to a service other than the original ZHS endpoints.
 # The caller immediately runs a read-only server diagnosis; any unverified import rolls back.
 
