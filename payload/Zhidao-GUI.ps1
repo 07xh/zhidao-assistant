@@ -1,4 +1,4 @@
-﻿# 知到学习助手 V5.2.8 · 官方 WebView2 播放 + 双模式读取。
+﻿# 知到学习助手 V5.2.9 Beta 1 · 官方 WebView2 播放 + 双模式读取。
 # 保留 ZHS 0.1.5 的登录和 V3 的 zhidao_only.py 数据读取适配器。
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework
@@ -50,6 +50,10 @@ $script:verifyErrorPath = $null
 $script:loginProbeState = ''
 $script:loginProbeCookieDigest = ''
 $script:loginProbeCheckedAt = $null
+$script:cookieImportActive = $false
+$script:cookieImportPreviousExists = $false
+$script:cookieImportPreviousBytes = $null
+$script:cookieImportExpectedDigest = ''
 
 
 function Load-Xaml([string]$path) {
@@ -123,6 +127,55 @@ function Any-TaskActive {
 }
 # Session state is a separate, syntax-checked module loaded before task handlers.
 . (Join-Path $script:root 'SessionState.ps1')
+. (Join-Path $script:root 'CookieImport.ps1')
+
+function Import-CookiesFromDialog {
+    if (Any-TaskActive -or $null -ne $script:activeTaskProcess -or $script:cookieImportActive) {
+        Notice '已有登录、同步或 Cookie 核验任务正在运行；请先结束该任务。'
+        return
+    }
+    if ($null -ne $script:pendingVerifyCourse) {
+        Notice '已有课程等待服务器核验；请先完成该项核验再切换账号。'
+        return
+    }
+    if ($null -ne $script:playerProcess) {
+        try {
+            $script:playerProcess.Refresh()
+            if (-not $script:playerProcess.HasExited) {
+                Notice '请先关闭官方播放窗口，再导入另一账号的 Cookie。'
+                return
+            }
+        } catch { }
+    }
+    $picker = New-Object Microsoft.Win32.OpenFileDialog
+    $picker.Title = '选择本人已授权的 ZHS cookies.json'
+    $picker.Filter = 'ZHS Cookie 文件 (*.json)|*.json'
+    $picker.Multiselect = $false
+    if ($picker.ShowDialog($script:window) -ne $true) { return }
+    if ([System.IO.Path]::GetFullPath($picker.FileName) -ieq [System.IO.Path]::GetFullPath($script:cookiePath)) {
+        Notice '所选文件已经是当前 ZHS Cookie 文件，无需再次导入。'
+        return
+    }
+    $yes = [System.Windows.MessageBox]::Show($script:window,
+        '仅支持本人其他安装中的 ZHS 0.1.5 cookies.json（JSON 列表），不支持直接粘贴浏览器 Cookie 字符串。导入将暂时替换当前本地登录凭证并只读检查服务器登录；核验未通过时尝试恢复原登录文件。Cookie 仍按上游 ZHS 规则以明文保存在本机。确认继续？',
+        '导入本人 Cookie · 本地敏感凭证', [System.Windows.MessageBoxButton]::YesNo,
+        [System.Windows.MessageBoxImage]::Warning, [System.Windows.MessageBoxResult]::No)
+    if ($yes -ne [System.Windows.MessageBoxResult]::Yes) { return }
+    try {
+        $json = Read-ZhidaoCookieImport $picker.FileName
+        Begin-ZhidaoCookieImport $json
+        Start-Task 'doctor'
+        if ($script:activeTaskAction -ne 'doctor' -or $null -eq $script:activeTaskProcess) {
+            $resultMessage = Complete-ZhidaoCookieImport $null
+            Notice ('无法启动服务端诊断。' + $resultMessage)
+        } else {
+            (Control 'SyncMessageText').Text = '已读取本机 Cookie 文件，正在只读检测服务器登录；核验完成前请勿关闭软件。'
+        }
+    } catch {
+        if ($script:cookieImportActive) { $null = Complete-ZhidaoCookieImport $null }
+        Notice 'Cookie 导入被拒绝或写入失败。仅支持知到域名下的 ZHS JSON Cookie 列表，请检查文件格式与权限；没有输出敏感内容。'
+    }
+}
 
 function Start-Task([string]$action) {
     if ($action -notin @('login','courses','progress','doctor')) { return }
@@ -153,13 +206,14 @@ function Start-Task([string]$action) {
         } else {
             (Control 'SyncMessageText').Text = '正在同步服务器视频或知识点进度；读取失败时保留旧缓存。'
         }
-    } catch { Notice '无法启动任务。请检查安装是否完整，或重新运行 V5.2.8 安装程序。' }
+    } catch { Notice '无法启动任务。请检查安装是否完整，或重新运行 V5.2.9 安装程序。' }
 }
 function Check-TaskExit {
     if ($null -eq $script:activeTaskProcess) { return }
     $autoCheckAfterLogin = $false
     $finishedPlayCourse = $null
     $finishedPlayFingerprint = ''
+    $importServerExitCode = $null
     try {
         $script:activeTaskProcess.Refresh()
         if (-not $script:activeTaskProcess.HasExited) { return }
@@ -181,6 +235,7 @@ function Check-TaskExit {
                 'ZHS 原版任务异常退出（退出码 '+$code+'）。本程序不会自动重试或补发心跳；可检查原命令窗口中的错误并运行连接诊断。'
             }
         } elseif ($action -eq 'doctor') {
+            $importServerExitCode = $code
             # A verified ZHS bootstrap is distinct from business endpoint health.
             $script:loginProbeCookieDigest = Get-CookieDigest
             $script:loginProbeCheckedAt = Get-Date
@@ -225,6 +280,19 @@ function Check-TaskExit {
         $script:activeTaskCourse = $null
         $script:activeTaskSessionFingerprint = ''
         $script:runningTasks = @()
+    }
+    if ($script:cookieImportActive) {
+        $importStatus = Complete-ZhidaoCookieImport $importServerExitCode
+        if ($importStatus) {
+            # Preserve the doctor result on success; only a rollback invalidates it.
+            if ($null -eq $importServerExitCode -or [int]$importServerExitCode -notin @(0, 6, 7)) {
+                $script:loginProbeState = ''
+                $script:loginProbeCookieDigest = ''
+                $script:loginProbeCheckedAt = $null
+                Update-LoginState
+            }
+            (Control 'SyncMessageText').Text = $importStatus
+        }
     }
     if ($null -ne $finishedPlayCourse) {
         $previousStatus = [string](Control 'SyncMessageText').Text
@@ -886,6 +954,7 @@ $modeSelector.Add_SelectionChanged({
 (Control 'BtnSyncCourses').Add_Click({ Start-Task 'courses' })
 (Control 'BtnSyncProgress').Add_Click({ Start-Task 'progress' })
 (Control 'BtnLogin').Add_Click({ Start-Task 'login' })
+(Control 'BtnImportCookies').Add_Click({ Import-CookiesFromDialog })
 (Control 'BtnDiagnose').Add_Click({ Start-Task 'doctor' })
 (Control 'BtnQR').Add_Click({
     if (Test-Path -LiteralPath $script:qrPath -PathType Leaf) { Start-Process -FilePath $script:qrPath }
@@ -934,6 +1003,13 @@ $script:timer = New-Object System.Windows.Threading.DispatcherTimer
 $script:timer.Interval = [TimeSpan]::FromSeconds(3)
 $script:timer.Add_Tick({
     try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
+})
+$script:window.Add_Closing({
+    param($sender, $eventArgs)
+    if ($script:cookieImportActive) {
+        $eventArgs.Cancel = $true
+        Notice 'Cookie 登录仍在服务器核验中。为保护原登录态，请先等待本次核验结果。'
+    }
 })
 $script:window.Add_Closed({ $script:timer.Stop(); $script:monitorTimer.Stop(); Save-PendingVerify })
 Refresh-Cache -Force

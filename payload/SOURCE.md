@@ -1,4 +1,4 @@
-# 源码与许可证 | Zhidao Assistant V5.2.8
+# 源码与许可证 | Zhidao Assistant V5.2.9 Beta 1
 
 本项目是非官方知到 App 学习记录查询桌面工具，使用开源 ZHS v0.1.5 Python 软件包。
 

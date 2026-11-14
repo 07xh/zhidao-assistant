@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           python build.py
-          EXE="ZhidaoAssistant-Setup-v5.2.8-dev.exe"
+          EXE="ZhidaoAssistant-Setup-v5.2.9-beta.1.exe"
           file "$EXE"
           file "$EXE" | grep -q PE32
           sha256sum "$EXE" > SHA256SUMS.txt
@@ -55,11 +55,11 @@ jobs:
       - name: Save tested development installer (not a GitHub Release)
         uses: actions/upload-artifact@v4
         with:
-          name: ZhidaoAssistant-v5.2.8-dev-windows-x64
+          name: ZhidaoAssistant-v5.2.9-beta.1-windows-x64
           if-no-files-found: error
           retention-days: 30
           path: |
-            ZhidaoAssistant-Setup-v5.2.8-dev.exe
+            ZhidaoAssistant-Setup-v5.2.9-beta.1.exe
             SHA256SUMS.txt
 
   windows-syntax:
@@ -91,3 +91,6 @@ jobs:
       - name: Test session-bound progress verification queue
         shell: powershell
         run: .\\test_pending_verify.ps1
+      - name: Test safe ZHS cookie-file import and rollback
+        shell: powershell
+        run: .\\test_cookie_import.ps1
