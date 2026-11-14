@@ -88,6 +88,9 @@ jobs:
       - name: Validate real installer manifest using Windows PowerShell 5.1
         shell: powershell
         run: .\\test_installer_manifest.ps1
+      - name: Test ownership-scoped old version and installer residue cleanup
+        shell: powershell
+        run: .\\test_legacy_cleanup.ps1
       - name: Test login state module with fake local cookies
         shell: powershell
         run: .\\test_session_state.ps1
