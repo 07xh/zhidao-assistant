@@ -855,6 +855,15 @@ function Add-Text($parent, [string]$value, [int]$fontSize, [string]$color = '#19
 function Select-Course([int]$index) {
     if ($script:selectedCourseIndex -ne $index -and $null -ne $script:monitorCourse) { Stop-Monitor }
     $script:selectedCourseIndex = $index
+    # Selection styling uses the same appearance brushes as the responsive list.
+    $picker = Control 'CourseListPanel'
+    for ($k = 0; $k -lt $picker.Children.Count; $k++) {
+        $rowButton = $picker.Children[$k]
+        if ($rowButton -isnot [System.Windows.Controls.Button]) { continue }
+        $selected = ($index -eq [int]$rowButton.Tag)
+        $rowButton.Background = if ($selected) { Get-UiBrush 'UiBackground_326FE5' } else { Get-UiBrush 'UiBackground_E9F0FB' }
+        $rowButton.Foreground = if ($selected) { [System.Windows.Media.Brushes]::White } else { Get-UiBrush 'UiForeground_2756A0' }
+    }
     $p = Control 'VideoListPanel'; $p.Children.Clear()
     if ($index -lt 0 -or $index -ge $script:courses.Count) {
         (Control 'DetailTitleText').Text = '选择左侧课程查看学习项目'
@@ -949,7 +958,14 @@ function Render-Data {
         for ($i = 0; $i -lt $script:courses.Count; $i++) {
             [void]$container.Children.Add((New-CourseCard $script:courses[$i] $i))
             $listBtn = New-Object System.Windows.Controls.Button
-            $listBtn.Content = [string]$script:courses[$i].name
+            $courseName = [string]$script:courses[$i].name
+            $listTitle = New-Object System.Windows.Controls.TextBlock
+            $listTitle.Text = $courseName
+            $listTitle.TextWrapping = 'Wrap'
+            $listTitle.TextTrimming = 'CharacterEllipsis'
+            $listTitle.MaxWidth = 190
+            $listBtn.Content = $listTitle
+            $listBtn.ToolTip = $courseName
             $listBtn.Tag = $i
             $listBtn.Style = $script:window.Resources['SecondaryButton']
             $listBtn.HorizontalContentAlignment = 'Left'
