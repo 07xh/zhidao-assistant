@@ -32,6 +32,7 @@ assert "Clear-ZhidaoStaleMonitorFiles -InstallRoot $root" in installer
 assert "Clear-ZhidaoOldSetupTemp" in installer
 assert "Clear-ZhidaoLegacyShortcuts" in uninstaller
 assert "Clear-ZhidaoLegacyRegistry" in uninstaller
+assert 'Assert-ZhidaoSafeUninstallTree -InstallRoot $root' in uninstaller
 assert "Remove-Item -LiteralPath $root -Recurse -Force" not in installer
 assert "Remove-Item -LiteralPath $root -Recurse -Force" in uninstaller
 assert 'if ($RemoveZhsData)' in uninstaller
