@@ -95,6 +95,16 @@
               </Grid>
               <ProgressBar x:Name="HeartbeatServerProgressBar" Height="7" Minimum="0" Maximum="100" Value="0" Foreground="#246BC8" Background="#E3EAF3"/>
               <TextBlock x:Name="HeartbeatProgressHint" Text="没有可确认的服务器进度" FontSize="10" Foreground="#6A7C92" Margin="0,5,0,0" TextWrapping="Wrap"/>
+              <StackPanel x:Name="HeartbeatZhsPanel" Visibility="Collapsed" Margin="0,11,0,0">
+                <Grid Margin="0,0,0,6">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="ZHS 原版 · 本地模拟片段" FontSize="11" FontWeight="SemiBold" Foreground="#344E6E"/>
+                  <TextBlock x:Name="HeartbeatZhsPercentText" Text="—" Grid.Column="1" FontSize="11" Foreground="#98611A" FontWeight="SemiBold"/>
+                </Grid>
+                <ProgressBar x:Name="HeartbeatZhsProgressBar" Height="7" Minimum="0" Maximum="100" Value="0" Foreground="#D29433" Background="#F0E6D5"/>
+                <TextBlock x:Name="HeartbeatZhsResourceText" Text="尚未检测到原版资源进度" FontSize="11" Margin="0,6,0,0" Foreground="#718096" TextWrapping="Wrap"/>
+                <TextBlock Text="仅来自原版控制台的模拟片段/资源进度；不代表实际视频观看或服务端确认。" FontSize="10" Margin="0,5,0,0" Foreground="#7C8794" TextWrapping="Wrap"/>
+              </StackPanel>
               <StackPanel x:Name="HeartbeatExpandedPanel" Visibility="Collapsed" Margin="0,12,0,0">
                 <TextBlock Text="官方播放器 · 本地位置（非学习完成进度）" FontSize="11" FontWeight="SemiBold" Foreground="#344E6E" Margin="0,0,0,5"/>
                 <TextBlock x:Name="HeartbeatLocalPlaybackText" Text="暂无本地 HTML5 播放观测" Foreground="#687B90" FontSize="11" TextWrapping="Wrap"/>
