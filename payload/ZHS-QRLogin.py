@@ -115,7 +115,15 @@ def _run_login_with_qr(config, session, observation: LoginObservation, data_dir:
 
     def scanned() -> None:
         observation.record("scanned")
-        print("[QR_SCANNED] 二维码已扫码；请在官方 App 中完成确认。")
+        # The original ZHS poller no longer reads its PNG after scan. Erase
+        # the one-use image immediately; a later expiry callback can still
+        # publish a fresh PNG. Keep all cookies and server state untouched.
+        try:
+            qr_path.unlink(missing_ok=True)
+        except OSError:
+            # The outer finally + GUI also retry removal at task exit.
+            print("[QR_CLEANUP_WARNING] 已扫码，但临时图片暂未清理；任务结束后将重试。")
+        print("[QR_SCANNED] 已扫码，二维码图片已撤除；请在官方 App 中确认登录。")
 
     try:
         result = LoginManager(session, config).login_with_qr(
