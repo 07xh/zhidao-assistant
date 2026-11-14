@@ -91,3 +91,6 @@ jobs:
       - name: Test session-bound progress verification queue
         shell: powershell
         run: .\\test_pending_verify.ps1
+      - name: Test safe ZHS cookie-file import and rollback
+        shell: powershell
+        run: .\\test_cookie_import.ps1
