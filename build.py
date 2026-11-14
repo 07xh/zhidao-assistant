@@ -17,7 +17,7 @@ import zipfile
 BASE = Path(__file__).resolve().parent
 SRC = BASE / "src"
 PAYLOAD = BASE / "payload"
-OUTPUT = BASE / "ZhidaoAssistant-Setup-v5.2.9-beta.1.exe"
+OUTPUT = BASE / "ZhidaoAssistant-Setup-v5.2.9-beta.2.exe"
 INSTALLER_SCRIPT = "Install.ps1"
 MANIFEST = "install-files.json"
 
