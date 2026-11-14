@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   windows-verify:
-    if: startsWith(github.event.head_commit.message, 'release: v5.2.9-beta.1')
+    if: "startsWith(github.event.head_commit.message, 'release: v5.2.9-beta.1')"
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
