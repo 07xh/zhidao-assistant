@@ -31,7 +31,7 @@ New-Item -ItemType Directory -Path $root -Force | Out-Null
 Stop-ZhidaoAppProcesses -InstallRoot $root
 # Collect names BEFORE replacing the old package manifest. Only previously
 # packaged code files or exact legacy names can be scheduled for deletion.
-$retiredFiles = @(Get-ZhidaoRetiredFiles -InstallRoot $root -CurrentFiles $files)
+$retiredFiles = Get-ZhidaoRetiredFiles -InstallRoot $root -CurrentFiles $files
 if ($retiredFiles.Count -gt 0) {
     Write-Host ('[Upgrade] Retired application files found: ' + ($retiredFiles -join ', '))
 }
