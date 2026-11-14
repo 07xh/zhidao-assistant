@@ -110,7 +110,7 @@ class StdoutObserver:
             self.frame = (self.frame + text)[-4096:]
             # Upstream progress typically prints CR + playing ... without LF.
             self.sink.receive(self.frame)
-            self.frame = re.split(r"[\r\n]", self.frame)[-2048:]
+            self.frame = re.split(r"[\r\n]", self.frame)[-1][-2048:]
         except Exception:
             pass
         return n
