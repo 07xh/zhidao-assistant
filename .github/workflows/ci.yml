@@ -88,3 +88,6 @@ jobs:
       - name: Test login state module with fake local cookies
         shell: powershell
         run: .\\test_session_state.ps1
+      - name: Test session-bound progress verification queue
+        shell: powershell
+        run: .\\test_pending_verify.ps1
