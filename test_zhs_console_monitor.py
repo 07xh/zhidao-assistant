@@ -72,7 +72,7 @@ class ZhsConsoleMonitorTests(unittest.TestCase):
         def intercept(module_name, *, run_name, alter_sys):
             observed.append((module_name, run_name, list(sys.argv)))
             sys.stdout.write("\rplaying [## ] 33.5%")
-            path = self.root / f"monitor-zhs-{self.token}.json"
+            path = self.root / "ZHSDesktop" / f"monitor-zhs-{self.token}.json"
             self.assertTrue(path.exists())
             self.assertEqual(json.loads(path.read_text())["videoSegmentPercent"], 33.5)
 
