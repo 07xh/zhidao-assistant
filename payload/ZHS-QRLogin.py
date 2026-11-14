@@ -178,7 +178,7 @@ def login_with_qr(config, session, observation: LoginObservation, data_dir: Path
 
 
 def main(argv: list[str] | None = None) -> int:
-    from zhs.cli.bootstrap import setup_logger
+    from loguru import logger
     from zhs.config import ConfigManager
     from zhs.session import ZhsSession
     from zhs.utils.path import get_data_dir
@@ -192,7 +192,10 @@ def main(argv: list[str] | None = None) -> int:
         data_dir = get_data_dir()
         config = ConfigManager().load()
         config.qr.image_path = str(data_dir / "qrcode.png")
-        setup_logger(config, debug=False, console_log=False)
+        # Upstream QR poll warnings/debug may contain request URLs or one-time
+        # QR identifiers. Disable those handlers for this one login process;
+        # the wrapper emits only fixed, non-sensitive QR stage codes.
+        logger.remove()
         session = ZhsSession(config)
         try:
             return login_with_qr(config, session, observation, data_dir)
