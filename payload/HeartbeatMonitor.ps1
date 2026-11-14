@@ -92,3 +92,33 @@ function Get-HeartbeatMonitorEvents($course) {
         $_.key -ceq $key -and $_.fingerprint -ceq $fp
     } | Select-Object -Last 7)
 }
+
+# Optional local-only observation produced by the real WebView2 HTML5 player.
+# Reject stale, unexpected, large or unrelated files; never trust it as
+# remote learning progress.
+function Get-HeartbeatLocalSnapshot([string]$token) {
+    if ($token -notmatch '^[0-9a-f]{32}$') { return $null }
+    $path = Join-Path $script:root ('monitor-playback-' + $token + '.json')
+    try {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+        $info = Get-Item -LiteralPath $path -ErrorAction Stop
+        if ($info.Length -lt 2 -or $info.Length -gt 2048) { return $null }
+        $item = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if ([string]$item.token -cne $token -or [int]$item.v -ne 1) { return $null }
+        $eventName = [string]$item.event
+        if ($eventName -notin @('observing','advancing','stalled','paused','buffering',
+                               'seeking','position-jump','sampling-gap','visibility-changed','ended')) { return $null }
+        $stamp = [DateTimeOffset]::Parse([string]$item.at)
+        $ageSeconds = ([DateTimeOffset]::UtcNow - $stamp).TotalSeconds
+        if ($ageSeconds -lt -10 -or $ageSeconds -gt 18) { return $null }
+        $position = [int]$item.position
+        $duration = [int]$item.duration
+        if ($position -lt 0 -or $position -gt 864000 -or $duration -lt 0 -or $duration -gt 864000) { return $null }
+        return [pscustomobject]@{
+            event = $eventName
+            position = $position
+            duration = $duration
+            visible = [bool]$item.visible
+        }
+    } catch { return $null }
+}
