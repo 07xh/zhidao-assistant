@@ -56,6 +56,7 @@ try {
     # Browser Cookie request header text is parsed locally, not sent to any new service.
     $typed = Convert-ZhidaoCookieText 'Cookie: CASLOGC=fake%3Dvalue; other=fake=='
     $parsed = @(ConvertFrom-Json -InputObject $typed)
+    Write-Host ('Synthetic parse debug: count={0}, firstName={1}, firstValueMatch={2}, secondValueMatch={3}, firstDomain={4}' -f $parsed.Count, [string]$parsed[0].name, ([string]$parsed[0].value -ceq 'fake%3Dvalue'), ([string]$parsed[1].value -ceq 'fake=='), [string]$parsed[0].domain)
     if ($parsed.Count -ne 2 -or $parsed[0].name -ne 'CASLOGC' -or
         $parsed[0].value -ne 'fake%3Dvalue' -or $parsed[1].value -ne 'fake==' -or
         $parsed[0].domain -ne '.zhihuishu.com') {
