@@ -19,6 +19,31 @@ function Test-ZhidaoOrdinaryDirectory([string]$path) {
     } catch { return $false }
 }
 
+# Windows PowerShell 5.1 recursive deletion must not traverse a user-created
+# junction into unrelated directories. Refuse full uninstall on such trees.
+function Assert-ZhidaoSafeUninstallTree {
+    param([Parameter(Mandatory=$true)][string]$InstallRoot)
+    if (-not (Test-ZhidaoOrdinaryDirectory $InstallRoot)) {
+        throw 'Refusing to uninstall a missing or linked installation directory.'
+    }
+    $folders = New-Object 'System.Collections.Generic.Stack[string]'
+    $folders.Push([IO.Path]::GetFullPath($InstallRoot))
+    while ($folders.Count -gt 0) {
+        $dir = $folders.Pop()
+        foreach ($entry in (Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop)) {
+            if (-not $entry.PSIsContainer) { continue }
+            if ([bool]($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                throw ('Uninstall blocked: a directory junction/link was found inside the app. ' +
+                    'Inspect/remove that link manually first; no recursive delete was attempted.')
+            }
+            if (-not (Test-ZhidaoPathInsideRoot $entry.FullName $InstallRoot)) {
+                throw 'Refusing to traverse a directory outside the exact app installation root.'
+            }
+            $folders.Push($entry.FullName)
+        }
+    }
+}
+
 function Test-ZhidaoPathInsideRoot([string]$path,[string]$root) {
     try {
         $base = [IO.Path]::GetFullPath($root).TrimEnd('\') + '\'
