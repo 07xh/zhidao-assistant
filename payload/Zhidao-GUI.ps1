@@ -277,8 +277,8 @@ function Start-Task([string]$action) {
             $script:qrStartedAt = Get-Date
             $script:qrViewerImageStamp = 0
             # Never show an earlier QR image (only the current attempt is valid).
-            if (Test-Path -LiteralPath $script:qrPath -PathType Leaf) {
-                Remove-Item -LiteralPath $script:qrPath -Force -ErrorAction Stop
+            if (-not (Clear-ZhidaoQrImage $script:qrPath)) {
+                throw 'Unable to clean the previous one-use QR image.'
             }
             if ($null -ne $script:qrViewerImage) {
                 $script:qrViewerImage.Source = $null
@@ -399,11 +399,7 @@ function Check-TaskExit {
             # The child normally deletes its one-use QR PNG. If it was killed
             # or crashed, retry removing that exact image when the process exits.
             # Never delete cookies.json, config.toml or other .zhs files here.
-            try {
-                if (Test-Path -LiteralPath $script:qrPath -PathType Leaf) {
-                    Remove-Item -LiteralPath $script:qrPath -Force -ErrorAction Stop
-                }
-            } catch {
+            if (-not (Clear-ZhidaoQrImage $script:qrPath)) {
                 (Control 'SyncMessageText').Text += ' 二维码临时图片清理失败；下次扫码将再次清理。'
             }
             # The GUI has consumed final sanitized status; clean per-attempt file.
