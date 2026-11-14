@@ -34,7 +34,7 @@ class FakeLoginResult:
     cookies = True
 
 
-def fake_modules(status, *, raise_login=None, qr_writes=True):
+def fake_modules(status, *, raise_login=None, qr_writes=True, refresh_after_scan=False):
     auth = types.ModuleType("zhs.api.session_auth")
     auth.SessionStatus = AuthStatus
     auth.verify_session = lambda session: status
@@ -52,6 +52,15 @@ def fake_modules(status, *, raise_login=None, qr_writes=True):
                 Path(image_path).write_bytes(b"valid fresh QR bytes")
             qr_callback(b"valid fresh QR bytes")
             on_scanned()
+            # The original login poller does not need the image after scan.
+            # Enforce immediate deletion here, before CAS verification begins.
+            if Path(image_path).exists():
+                raise AssertionError("QR PNG remained on disk after on_scanned")
+            if refresh_after_scan:
+                # Expired QR may be replaced with another image during the
+                # same upstream login attempt; must remain displayable.
+                Path(image_path).write_bytes(b"new refreshed QR")
+                qr_callback(b"new refreshed QR")
             return FakeLoginResult()
 
     login.LoginManager = Manager
@@ -121,6 +130,19 @@ class QrLoginTests(unittest.TestCase):
         self.assertEqual(self.login(AuthStatus.EXPIRED), 7)
         self.assertFalse((self.data / "qrcode.png").exists())
         self.assertTrue((self.data / "cookies.json").exists())
+
+    def test_qr_is_recreated_if_original_poller_refreshes_after_scan(self):
+        self.assertEqual(self.login(AuthStatus.OK, refresh_after_scan=True), 0)
+        self.assertEqual(json.loads(self.obs.path.read_text())["stage"], "verified")
+        self.assertFalse((self.data / "qrcode.png").exists())
+        self.assertIn("[QR_READY]", self.out.getvalue())
+        self.assertIn("[QR_SCANNED]", self.out.getvalue())
+
+    def test_gui_exit_during_active_qr_login_requires_process_state(self):
+        gui = (HERE / "payload" / "Zhidao-GUI.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn("if ($script:activeTaskAction -eq 'login' -and $null -ne $script:activeTaskProcess)", gui)
+        self.assertIn("$script:activeTaskProcess.HasExited", gui)
+        self.assertIn("if (-not (Clear-ZhidaoQrImage $script:qrPath))", gui)
 
     def test_unsafe_telemetry_path_rejected(self):
         for token in ("../outside", "Z" * 32, "e" * 33):

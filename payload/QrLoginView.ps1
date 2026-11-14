@@ -64,10 +64,15 @@ function Update-ZhidaoQrView {
     (Control 'QrLoginStateText').Text = $caption
     if ($null -eq $script:qrViewer -or -not $script:qrViewer.IsVisible) { return }
     $script:qrViewerStatus.Text = $caption
-    if ($stage -notin @('ready','scanned','confirming')) {
-        if ($stage -in @('verified','rejected','cancelled','failed','expired','unavailable')) {
+    # The QR picture is needed only until the first scan. Once the phone
+    # has scanned it, clear the WPF BitmapImage reference immediately; never
+    # keep showing a reusable token while waiting for phone confirmation.
+    # Any fresh QR from upstream expiry retries is reported as 'ready'.
+    if ($stage -ne 'ready') {
+        if ($null -ne $script:qrViewerImage) {
             $script:qrViewerImage.Source = $null
         }
+        $script:qrViewerImageStamp = 0
         return
     }
     try {
@@ -137,6 +142,12 @@ function Show-ZhidaoQrDialog {
     $script:qrViewerStatus = $status
     $script:qrViewerImageStamp = 0
     $dialog.Add_Closed({
+        # Closing the QR window does not stop the CLI; it must not retain the
+        # one-use bitmap in WPF after the window itself disappears.
+        if ($null -ne $script:qrViewerImage) {
+            $script:qrViewerImage.Source = $null
+        }
+        $script:qrViewerImageStamp = 0
         $script:qrViewer = $null
         $script:qrViewerImage = $null
         $script:qrViewerStatus = $null
