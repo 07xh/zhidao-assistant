@@ -27,6 +27,10 @@ New-Item -ItemType Directory -Path $root -Force | Out-Null
 # Automatically close only process instances that belong to this exact per-user install.
 # Do not run an old Uninstall.ps1 here: it may remove login/runtime data or registry state.
 . (Join-Path $sourceDir 'AppLifecycle.ps1')
+. (Join-Path $sourceDir 'LegacyCleanup.ps1')
+# Upgrade in place; do not pre-delete the old app, Python environment, or login data.
+# The current file transaction retains backups for rollback on failure.
+[void](Assert-ZhidaoOwnedRoot -InstallRoot $root)
 Stop-ZhidaoAppProcesses -InstallRoot $root
 function Assert-LauncherAvailable {
     $targetExe = Join-Path $root 'ZhidaoAssistant.exe'
@@ -276,12 +280,18 @@ try {
 } catch {
     Write-Warning ('WebView2 SDK installation failed; official browser fallback remains available. ' + $_.Exception.Message)
 }
-# Remove only known obsolete application launchers from prior in-place versions.
-# The currently installed application files were replaced with rollback above.
-# Retain .venv, uv.exe, cookies, cache, and any unknown user-owned files.
-foreach ($oldName in @('ZHS-CLI.cmd','ZHS-GUI.ps1')) {
-    $legacy = Join-Path $root $oldName
-    if (Test-Path -LiteralPath $legacy) { Remove-Item -LiteralPath $legacy -Force }
+# Only after successfully installing the new application payload: delete
+# reviewed obsolete app launchers, expired read-only monitor snapshots, and
+# installer-owned temporary directories. Never run old uninstall scripts:
+# they would erase the working Python environment and break rollback.
+try {
+    $removedLegacy = Remove-ZhidaoOldAppResidue -InstallRoot $root
+    $removedTemp = Clear-ZhidaoInstallerTempResidue -OlderThanDays 7
+    Write-Host ("[Upgrade] Cleaned {0} obsolete application file(s) and {1} old installer temporary item(s)." -f $removedLegacy,$removedTemp)
+} catch {
+    # App payload replacement is already committed. Do not report the upgrade
+    # as failed or retry installation solely because optional cleanup failed.
+    Write-Warning ('Upgrade installed, but some old cleanup was not completed: ' + $_.Exception.Message)
 }
 $desktop = [Environment]::GetFolderPath('Desktop')
 $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $desktop '知到学习助手.lnk'))
