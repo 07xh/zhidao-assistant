@@ -39,7 +39,9 @@ $script:autoNext = $true
 $script:playerProcess = $null
 $script:playerCourse = $null
 $script:playerOpenedAt = $null
+$script:playerSessionFingerprint = ''
 $script:pendingVerifyCourse = $null
+$script:pendingVerifySessionFingerprint = ''
 $script:pendingVerifyPath = Join-Path $script:root 'pending-verify.json'
 $script:verifyOutputPath = $null
 $script:verifyErrorPath = $null
@@ -234,8 +236,11 @@ function Get-SessionFingerprint {
 function Save-PendingVerify {
     if ($null -eq $script:pendingVerifyCourse) { return }
     $valid = Valid-CourseArgs $script:pendingVerifyCourse
-    if ($null -eq $valid) { return }
-    $body = @{ courseType = $valid[0]; courseId = $valid[1]; classId = $valid[2] } | ConvertTo-Json -Compress
+    $fingerprint = $script:pendingVerifySessionFingerprint
+    if ($null -eq $valid -or [string]::IsNullOrWhiteSpace($fingerprint) -or
+        $fingerprint -ne (Get-SessionFingerprint)) { return }
+    # HMAC-based cache fingerprint, never raw cookies or an unsalted cookie hash.
+    $body = @{ courseType = $valid[0]; courseId = $valid[1]; classId = $valid[2]; sessionFingerprint = $fingerprint } | ConvertTo-Json -Compress
     try {
         $tmp = $script:pendingVerifyPath + '.tmp'
         [System.IO.File]::WriteAllText($tmp, $body, [System.Text.Encoding]::UTF8)
@@ -246,8 +251,27 @@ function Load-PendingVerify {
     if (-not (Test-Path -LiteralPath $script:pendingVerifyPath -PathType Leaf)) { return }
     try {
         $row = Get-Content -LiteralPath $script:pendingVerifyPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ($null -ne (Valid-CourseArgs $row)) { $script:pendingVerifyCourse = $row }
+        $fingerprint = [string]$row.sessionFingerprint
+        $valid = Valid-CourseArgs $row
+        if ($null -ne $valid -and $fingerprint -match '^[0-9a-f]{64}$' -and
+            $fingerprint -eq (Get-SessionFingerprint)) {
+            $script:pendingVerifyCourse = $row
+            $script:pendingVerifySessionFingerprint = $fingerprint
+            return
+        }
     } catch { }
+    # Refuse old unbound queue records and those belonging to another login session.
+    Remove-Item -LiteralPath $script:pendingVerifyPath -Force -ErrorAction SilentlyContinue
+}
+function Queue-PendingVerify($course, [string]$sessionFingerprint) {
+    if ($null -ne $script:pendingVerifyCourse) { return $false }
+    if ($null -eq (Valid-CourseArgs $course) -or
+        [string]::IsNullOrWhiteSpace($sessionFingerprint) -or
+        $sessionFingerprint -ne (Get-SessionFingerprint)) { return $false }
+    $script:pendingVerifyCourse = $course
+    $script:pendingVerifySessionFingerprint = $sessionFingerprint
+    Save-PendingVerify
+    return $true
 }
 function Check-VerifyExit {
     if ($null -eq $script:monitorProcess) { return }
