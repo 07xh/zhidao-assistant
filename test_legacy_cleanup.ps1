@@ -70,11 +70,12 @@ try {
 
     # Delete only shortcuts that resolve to this application's exact launcher.
     $shell = New-Object -ComObject WScript.Shell
-    $ownedLink = Join-Path $desktop '知到助手.lnk'
-    $otherLink = Join-Path $desktop '知到学习助手.lnk'
+    $ownedLink = Join-Path $desktop 'ZHS Desktop.lnk'
+    $otherLink = Join-Path $desktop 'Zhidao Desktop.lnk'
     $shortcut = $shell.CreateShortcut($ownedLink)
     $shortcut.TargetPath = Join-Path $installRoot 'ZhidaoAssistant.exe'
     $shortcut.Save()
+    [IO.File]::WriteAllText((Join-Path $foreign 'ZhidaoAssistant.exe'),'other executable fixture')
     $shortcut = $shell.CreateShortcut($otherLink)
     $shortcut.TargetPath = Join-Path $foreign 'ZhidaoAssistant.exe'
     $shortcut.Save()
