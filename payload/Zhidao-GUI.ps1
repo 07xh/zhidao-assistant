@@ -837,51 +837,98 @@ function Add-Text($parent, [string]$value, [int]$fontSize, [string]$color = '#19
     $t = New-Object System.Windows.Controls.TextBlock
     $t.Text = $value; $t.FontSize = $fontSize
     $t.TextWrapping = 'Wrap'
-    $t.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString($color)
+    $t.Foreground = Get-UiTextBrush $color
     if ($semibold) { $t.FontWeight = [System.Windows.FontWeights]::SemiBold }
     [void]$parent.Children.Add($t)
     return $t
 }
 function New-CourseCard($course, [int]$index) {
+    # Read-only presentation of the last available per-course record.
     $progress = Find-Progress $course
+    $isAi = ([string]$course.courseType -eq 'ai')
+    $stale = [bool]$course.stale -or ($null -ne $progress -and [bool]$progress.stale)
+    $verified = ($null -ne $progress -and -not $stale -and -not [string]::IsNullOrWhiteSpace([string]$progress.lastVerifiedAt))
     $card = New-Object System.Windows.Controls.Border
-    $card.Background = [System.Windows.Media.Brushes]::White
-    $card.BorderBrush = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#E4EBF3')
+    $card.Background = Get-UiBrush 'UiBackground_FFFFFF'
+    $card.BorderBrush = Get-UiBrush 'UiBorderBrush_DCE9FA'
     $card.BorderThickness = [System.Windows.Thickness]::new(1)
-    $card.CornerRadius = [System.Windows.CornerRadius]::new(14)
-    $card.Margin = [System.Windows.Thickness]::new(0,0,0,12)
+    $card.CornerRadius = [System.Windows.CornerRadius]::new(18)
+    $card.Margin = [System.Windows.Thickness]::new(0,0,14,14)
     $card.Padding = [System.Windows.Thickness]::new(18)
+    $card.MinHeight = 208
     $stack = New-Object System.Windows.Controls.StackPanel
     $card.Child = $stack
-    $title = Add-Text $stack ([string]$course.name) 16 '#1A2B42' $true
-    $title.Margin = [System.Windows.Thickness]::new(0,0,0,7)
-    if ($null -eq $progress) {
-        $description = if ($course.courseType -eq 'ai') { '智慧课程 · 暂无知识点进度' } else { '共享课 · 暂无视频进度' }
-    } elseif ($course.courseType -eq 'ai') {
-        $description = "智慧课程 · 已达满进度知识点 $($progress.fullProgressPoints) / $($progress.knowledgePointCount)（非整体掌握度）"
-    } else {
-        $description = "共享课 · 已完成视频 $($progress.completedVideos) / $($progress.videoCount)"
+    $badges = New-Object System.Windows.Controls.DockPanel
+    $badges.LastChildFill = $false
+    $badges.Margin = [System.Windows.Thickness]::new(0,0,0,12)
+    $kind = New-Object System.Windows.Controls.Border
+    $kind.Background = Get-UiBrush 'UiBackground_F8FBFF'
+    $kind.CornerRadius = [System.Windows.CornerRadius]::new(9)
+    $kind.Padding = [System.Windows.Thickness]::new(9,5,9,5)
+    $kind.HorizontalAlignment = 'Left'
+    $typeText = New-Object System.Windows.Controls.TextBlock
+    $typeText.Text = if ($isAi) { '智慧课程' } else { '共享课程' }
+    $typeText.FontSize = 11
+    $typeText.Foreground = Get-UiBrush 'UiForeground_234F97'
+    $kind.Child = $typeText
+    [void]$badges.Children.Add($kind)
+    $statusText = if ($stale) { '历史缓存' } elseif ($verified) { '上次已核验' } else { '未核验' }
+    $status = New-Object System.Windows.Controls.Border
+    $status.Background = if ($stale) { Get-UiBrush 'UiBackground_FFFBF5' } elseif ($verified) { Get-UiBrush 'UiBackground_F7FCFA' } else { Get-UiBrush 'UiBackground_EDF3FC' }
+    $status.CornerRadius = [System.Windows.CornerRadius]::new(9)
+    $status.Padding = [System.Windows.Thickness]::new(8,5,8,5)
+    $status.HorizontalAlignment = 'Right'
+    [System.Windows.Controls.DockPanel]::SetDock($status,[System.Windows.Controls.Dock]::Right)
+    $statusLabel = New-Object System.Windows.Controls.TextBlock
+    $statusLabel.FontSize = 11
+    $statusLabel.Text = $statusText
+    $statusLabel.Foreground = if ($stale) { Get-UiBrush 'UiForeground_AB763D' } elseif ($verified) { Get-UiBrush 'UiForeground_277A68' } else { Get-UiBrush 'UiForeground_566C87' }
+    $status.Child = $statusLabel
+    [void]$badges.Children.Add($status)
+    [void]$stack.Children.Add($badges)
+    $name = [string]$course.name
+    if ([string]::IsNullOrWhiteSpace($name)) { $name = '未命名课程' }
+    $title = Add-Text $stack $name 16 '#1A2B42' $true
+    $title.Margin = [System.Windows.Thickness]::new(0,0,0,10)
+    $title.ToolTip = $name
+    $total = 0.0; $done = 0.0
+    if ($null -ne $progress) {
+        try {
+            if ($isAi) {
+                $total = [double]$progress.knowledgePointCount
+                $done = [double]$progress.fullProgressPoints
+            } else {
+                $total = [double]$progress.videoCount
+                $done = [double]$progress.completedVideos
+            }
+        } catch { $total = 0.0; $done = 0.0 }
     }
-    if (($null -ne $progress -and $progress.stale) -or $course.stale) { $description += ' · 历史缓存待确认' }
+    $validCounts = ($total -gt 0 -and $done -ge 0 -and $done -le $total)
+    $description = if ($stale) { '历史进度仅供参考，请重新同步核验' }
+        elseif (-not $verified) { '暂无可核验的最新学习进度' }
+        elseif (-not $validCounts) { '服务器已返回记录，暂无有效进度统计' }
+        elseif ($isAi) { '满进度知识点：' + [int]$done + ' / ' + [int]$total }
+        else { '已完成视频：' + [int]$done + ' / ' + [int]$total }
     $subtitle = Add-Text $stack $description 12 '#75869B'
-    $subtitle.Margin = [System.Windows.Thickness]::new(0,0,0,12)
-    $partTotal = if ($course.courseType -eq 'ai') { [double]$progress.knowledgePointCount } else { [double]$progress.videoCount }
-    $partDone = if ($course.courseType -eq 'ai') { [double]$progress.fullProgressPoints } else { [double]$progress.completedVideos }
-    if ($null -ne $progress -and $partTotal -gt 0) {
+    $subtitle.Margin = [System.Windows.Thickness]::new(0,0,0,9)
+    if ($verified -and $validCounts) {
         $bar = New-Object System.Windows.Controls.ProgressBar
-        $bar.Height = 8; $bar.Minimum = 0; $bar.Maximum = 100
-        $bar.Value = [Math]::Min(100,[Math]::Max(0, (100.0 * $partDone / $partTotal)))
-        $bar.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#2369D9')
-        $bar.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#E9EEF5')
-        $bar.Margin = [System.Windows.Thickness]::new(0,0,0,12)
+        $bar.Height = 7; $bar.Minimum = 0; $bar.Maximum = 100
+        $bar.Value = [Math]::Round(100.0 * $done / $total,1)
+        $bar.Foreground = Get-UiBrush 'UiForeground_2566B2'
+        $bar.Background = Get-UiBrush 'UiBackground_E3EAF3'
+        $bar.Margin = [System.Windows.Thickness]::new(0,0,0,6)
         [void]$stack.Children.Add($bar)
+        $note = if ($isAi) { '知识点项目比例，并非官方整课进度' } else { '已完成视频数量比例，并非观看时长' }
+        $hint = Add-Text $stack $note 10 '#75869B'
+        $hint.Margin = [System.Windows.Thickness]::new(0,0,0,12)
     }
     $button = New-Object System.Windows.Controls.Button
-    $button.Content = if ($course.courseType -eq 'ai') { '查看知识点  ›' } else { '查看视频详情  ›' }
+    $button.Content = if ($isAi) { '查看知识点  ›' } else { '查看视频详情  ›' }
     $button.Tag = $index
     $button.HorizontalAlignment = 'Left'
     $button.Style = $script:window.Resources['SecondaryButton']
-    $button.Margin = [System.Windows.Thickness]::new(0)
+    $button.Margin = [System.Windows.Thickness]::new(0,5,0,0)
     $button.Add_Click({ param($sender,$eventArgs) Select-Course ([int]$sender.Tag); Show-Page 'detail' })
     [void]$stack.Children.Add($button)
     return $card
@@ -965,6 +1012,7 @@ function Render-Data {
     (Control 'PendingCountText').Text = if ($showCounts) { [string]([Math]::Max(0,$total-$finished)) } else { '—' }
     (Control 'CourseSyncTimeText').Text = if ($script:hasCourses) { '课程同步：' + (Format-Time $script:coursesTimestamp) } else { '尚无课程缓存' }
     Update-LoginState
+    Update-LoginPresentation
     $container = Control 'HomeCourseCards'; $container.Children.Clear()
     $left = Control 'CourseListPanel'; $left.Children.Clear()
     if ($script:courses.Count -eq 0) {
@@ -995,6 +1043,7 @@ function Render-Data {
         if ($script:selectedCourseIndex -ge 0 -and $script:selectedCourseIndex -lt $script:courses.Count) { Select-Course $script:selectedCourseIndex }
         else { Select-Course 0 }
     }
+    Update-UiLayout
     if ($script:hasProgress) {
         (Control 'BottomStatusText').Text = 'V5.2.8 · 最近一次同步的进度：' + (Format-Time $script:progressTimestamp) + ' · 非官方双模式工具'
         if ($script:progressIncomplete -or $cachedRows -gt 0) {
@@ -1051,6 +1100,46 @@ function Refresh-Cache([switch]$Force) {
     }
     Render-Data
 }
+function Update-LoginPresentation {
+    if ($null -eq $script:window) { return }
+    $state = [string]$script:loginProbeState
+    $exists = Test-Path -LiteralPath $script:cookiePath -PathType Leaf
+    $guide = if (-not $exists) {
+        '尚未检测到本机登录凭据。可使用扫码、直接输入或导入文件；完成后运行连接诊断。'
+    } else {
+        switch ($state) {
+            'checking' { '正在核验会话和课程接口；暂不能视为登录成功。' }
+            'confirmed' { '服务器会话与两类课程接口已验证，可以同步课程。' }
+            'partial' { '已验证服务端会话，但部分课程接口异常；请查看连接诊断。' }
+            'course-failed' { '已验证服务端会话，但课程接口异常；请查看诊断。' }
+            'local-invalid' { '本机凭据无效，请重新扫码或输入本人凭据。' }
+            'session-unconfirmed' { '网络或会话尚未确认，请运行连接诊断。' }
+            'environment-error' { '诊断尚未完成；请检查本机运行环境。' }
+            default { '已发现本地凭据，但还没有服务器验证结果；请运行连接诊断。' }
+        }
+    }
+    (Control 'LoginGuideText').Text = $guide
+    $dot = Control 'LoginStateDot'
+    $dot.Fill = if ($state -eq 'confirmed' -and $exists) {
+        Get-UiBrush 'UiForeground_277A68'
+    } elseif ($exists -and $state -in @('checking','partial','course-failed')) {
+        Get-UiBrush 'UiForeground_AB763D'
+    } else {
+        Get-UiBrush 'UiFill_8A9DB5'
+    }
+}
+function Toggle-UiTheme {
+    $newMode = if ($script:uiThemeMode -eq 'dark') { 'light' } else { 'dark' }
+    Apply-UiTheme $newMode
+    try {
+        [System.IO.File]::WriteAllText($script:uiThemePath,$newMode,[System.Text.UTF8Encoding]::new($false))
+    } catch {
+        (Control 'SyncMessageText').Text = '主题已切换，但无法保存偏好；重启后可能恢复浅色。'
+    }
+    Render-Data
+    Update-LoginPresentation
+    Update-UiLayout
+}
 function Show-Page([string]$page) {
     (Control 'PageHome').Visibility = if ($page -eq 'home') { 'Visible' } else { 'Collapsed' }
     (Control 'PageDetail').Visibility = if ($page -eq 'detail') { 'Visible' } else { 'Collapsed' }
@@ -1078,6 +1167,10 @@ if (-not (Test-Path -LiteralPath $script:python -PathType Leaf)) {
 }
 if (-not (Ask-Consent)) { exit 0 }
 $script:window = Load-Xaml (Join-Path $script:root 'Zhidao-UI.xaml')
+. (Join-Path $script:root 'UiAppearance.ps1')
+Initialize-UiAppearance
+$script:window.Add_Loaded({ Update-UiLayout })
+$script:window.Add_SizeChanged({ Update-UiLayout })
 # Only trusted fixed strings are accepted as a saved mode; never execute file contents.
 try {
     if (Test-Path -LiteralPath $script:modePath -PathType Leaf) {
@@ -1127,6 +1220,8 @@ $modeSelector.Add_SelectionChanged({
 (Control 'NavHome').Add_Click({ Show-Page 'home' })
 (Control 'NavDetail').Add_Click({ Show-Page 'detail' })
 (Control 'NavSettings').Add_Click({ Show-Page 'settings' })
+(Control 'BtnLoginShortcut').Add_Click({ Show-Page 'settings' })
+(Control 'BtnThemeToggle').Add_Click({ Toggle-UiTheme })
 (Control 'BtnSyncCourses').Add_Click({ Start-Task 'courses' })
 (Control 'BtnSyncProgress').Add_Click({ Start-Task 'progress' })
 (Control 'BtnLogin').Add_Click({ Start-Task 'login' })
@@ -1183,7 +1278,7 @@ $script:monitorTimer.Add_Tick({ if ($null -ne $script:monitorCourse) { Launch-Ve
 $script:timer = New-Object System.Windows.Threading.DispatcherTimer
 $script:timer.Interval = [TimeSpan]::FromSeconds(3)
 $script:timer.Add_Tick({
-    try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache; Update-HeartbeatPanel; Update-ZhidaoQrView } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
+    try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache; Update-HeartbeatPanel; Update-ZhidaoQrView; Update-LoginPresentation } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
 })
 $script:window.Add_Closing({
     param($sender, $eventArgs)
@@ -1225,5 +1320,7 @@ $script:window.Add_Closed({ $script:timer.Stop(); $script:monitorTimer.Stop(); S
 Refresh-Cache -Force
 Load-PendingVerify
 Show-Page 'home'
+Update-UiLayout
+Update-LoginPresentation
 $script:timer.Start()
 [void]$script:window.ShowDialog()
