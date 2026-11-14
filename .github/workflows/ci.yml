@@ -112,3 +112,6 @@ jobs:
       - name: Test appearance theme and responsive WPF layout
         shell: powershell
         run: .\\test_ui_appearance_wpf.ps1
+      - name: Smoke test dynamic course card status and theme
+        shell: powershell
+        run: .\\test_ui_course_cards_wpf.ps1
