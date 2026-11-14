@@ -23,8 +23,8 @@ try {
     $script:qrViewer = $null
     . (Join-Path $PSScriptRoot 'payload\QrLoginView.ps1')
     Update-ZhidaoQrView
-    if ((Control 'QrLoginStateText').Text -notmatch '尚未开始') {
-        throw 'Unobserved QR status was invented'
+    if ((Control 'QrLoginStateText').Text -notmatch '正在从官方登录服务获取新二维码') {
+        throw 'An active QR attempt without a state file must show a pending state'
     }
     $file = Join-Path $script:root ('monitor-qr-' + $script:activeQrToken + '.json')
     $state = @{v=1;token=$script:activeQrToken;stage='ready';
