@@ -25,6 +25,7 @@
   "Verify-Environment.py",
   "Windows-Preflight.ps1",
   "AppLifecycle.ps1",
+  "LegacyCleanup.ps1",
   "Patch-ZHS-0.1.5.py",
   "verify_and_integrate_v4.py",
   "apply_safe_fixes_v2.py",
