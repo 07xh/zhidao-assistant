@@ -94,3 +94,6 @@ jobs:
       - name: Test safe ZHS cookie-file import and rollback
         shell: powershell
         run: .\\test_cookie_import.ps1
+      - name: Test read-only course monitor session and local observations
+        shell: powershell
+        run: .\\test_heartbeat_monitor.ps1
