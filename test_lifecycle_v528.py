@@ -25,7 +25,13 @@ assert 'Wait-LauncherAvailable' not in installer
 assert 'Assert-LauncherAvailable' in installer
 assert "'install-files.json'" in installer
 assert 'Get-FileHash -LiteralPath $src -Algorithm SHA256' in installer
-assert "foreach ($oldName in @('ZHS-CLI.cmd','ZHS-GUI.ps1'))" in installer
+assert "Get-ZhidaoRetiredFiles -InstallRoot $root -CurrentFiles $files" in installer
+assert "foreach ($name in $retiredFiles)" in installer
+assert "Legacy rollback integrity failure" in installer
+assert "Clear-ZhidaoStaleMonitorFiles -InstallRoot $root" in installer
+assert "Clear-ZhidaoOldSetupTemp" in installer
+assert "Clear-ZhidaoLegacyShortcuts" in uninstaller
+assert "Clear-ZhidaoLegacyRegistry" in uninstaller
 assert "Remove-Item -LiteralPath $root -Recurse -Force" not in installer
 assert "Remove-Item -LiteralPath $root -Recurse -Force" in uninstaller
 assert 'if ($RemoveZhsData)' in uninstaller
