@@ -51,6 +51,7 @@ class NumericTelemetry:
         # Input may contain arbitrary user/API text; never store or echo it.
         safe = ANSI_RE.sub("", chunk[-4096:])
         newest = re.split(r"[\r\n]", safe)[-1]
+        accepted = False
         r = RESOURCE_RE.search(newest)
         if r:
             i, n = int(r.group(1)), int(r.group(2))
@@ -58,12 +59,14 @@ class NumericTelemetry:
                 if (self.resource_index, self.resource_total) != (i, n):
                     self.percent = None
                 self.resource_index, self.resource_total = i, n
+                accepted = True
         v = VIDEO_RE.search(newest)
         if v:
             p = float(v.group(1))
             if 0 <= p <= MAX_PERCENT:
                 self.percent = p
-        if r or v:
+                accepted = True
+        if accepted:
             self.publish()
 
     def publish(self) -> None:
