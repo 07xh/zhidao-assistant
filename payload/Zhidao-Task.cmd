@@ -36,7 +36,17 @@ if not exist "%ZHS%" (
   echo [ENV] ZHS entrypoint is missing. Reinstall the app.
   exit /b 5
 )
-"%ZHS%" login
+REM The app QR helper uses upstream ZHS 0.1.5 QR polling unchanged.
+REM It verifies CAS before claiming authentication and reports fixed state codes.
+if not exist "%ROOT%\ZHS-QRLogin.py" (
+  echo [ENV] QR login component missing. Reinstall the current setup.
+  exit /b 5
+)
+if "%~2"=="" (
+  echo [INVALID] QR login monitor token missing.
+  exit /b 2
+)
+"%PY%" "%ROOT%\ZHS-QRLogin.py" "%~2"
 exit /b %ERRORLEVEL%
 
 :courses

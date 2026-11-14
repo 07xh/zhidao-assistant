@@ -54,6 +54,13 @@ $script:playerMonitorToken = ''
 $script:loginProbeState = ''
 $script:loginProbeCookieDigest = ''
 $script:loginProbeCheckedAt = $null
+$script:activeQrToken = ''
+$script:lastQrStatus = ''
+$script:qrStartedAt = [DateTime]::MinValue
+$script:qrViewer = $null
+$script:qrViewerImage = $null
+$script:qrViewerStatus = $null
+$script:qrViewerImageStamp = 0
 $script:cookieImportActive = $false
 $script:cookieImportPreviousExists = $false
 $script:cookieImportPreviousBytes = $null
@@ -131,6 +138,7 @@ function Any-TaskActive {
 }
 # Session state is a separate, syntax-checked module loaded before task handlers.
 . (Join-Path $script:root 'SessionState.ps1')
+. (Join-Path $script:root 'QrLoginView.ps1')
 . (Join-Path $script:root 'CookieImport.ps1')
 . (Join-Path $script:root 'HeartbeatMonitor.ps1')
 . (Join-Path $script:root 'HeartbeatView.ps1')
@@ -262,7 +270,22 @@ function Start-Task([string]$action) {
     }
     try {
         $taskPath = Join-Path $script:root 'Zhidao-Task.cmd'
-        $proc = Start-Process -FilePath $taskPath -ArgumentList $action -WorkingDirectory $env:USERPROFILE -PassThru
+        $launchArgs = @($action)
+        if ($action -eq 'login') {
+            $script:activeQrToken = [Guid]::NewGuid().ToString('N')
+            $script:lastQrStatus = ''
+            $script:qrStartedAt = Get-Date
+            $script:qrViewerImageStamp = 0
+            # Never show an earlier QR image (only the current attempt is valid).
+            if (Test-Path -LiteralPath $script:qrPath -PathType Leaf) {
+                Remove-Item -LiteralPath $script:qrPath -Force -ErrorAction Stop
+            }
+            if ($null -ne $script:qrViewerImage) {
+                $script:qrViewerImage.Source = $null
+            }
+            $launchArgs = @('login', $script:activeQrToken)
+        }
+        $proc = Start-Process -FilePath $taskPath -ArgumentList $launchArgs -WorkingDirectory $env:USERPROFILE -PassThru
         $script:runningTasks = @($proc)
         $script:activeTaskProcess = $proc
         $script:activeTaskAction = $action
@@ -276,8 +299,8 @@ function Start-Task([string]$action) {
         if ($action -eq 'doctor') {
             (Control 'SyncMessageText').Text = '正在只读检查知到课程接口：不上传播放时长、不改变课程进度。'
         } elseif ($action -eq 'login') {
-            (Control 'SyncMessageText').Text = '已打开扫码登录窗口。二维码生成后可在设置页查看。'
-            Notice '请在弹出的窗口中等待生成二维码，然后到“设置与隐私”查看二维码并用官方知到 App 扫码。'
+            (Control 'SyncMessageText').Text = '正在申请本次新二维码，扫码后还需手机确认及服务器认证。'
+            Show-ZhidaoQrDialog
         } elseif ($action -eq 'courses') {
             (Control 'SyncMessageText').Text = '正在同步本人课程。结果以服务器返回的数据为准。'
         } else {
@@ -291,6 +314,7 @@ function Check-TaskExit {
     $finishedPlayCourse = $null
     $finishedPlayFingerprint = ''
     $finishedZhsToken = $script:activeTaskZhsToken
+    $finishedQrToken = $script:activeQrToken
     $importServerExitCode = $null
     $code = -1
     try {
@@ -304,9 +328,23 @@ function Check-TaskExit {
         }
         if ($action -eq 'login') {
             $autoCheckAfterLogin = ($code -eq 0)
-            (Control 'SyncMessageText').Text = if ($code -eq 0) {
-                '扫码登录命令已结束，正在自动检测服务端登录状态。'
-            } else { '扫码登录未成功（退出码 '+$code+'）。请重新扫码，或检查网络和窗口中的提示。' }
+            $script:lastQrStatus = Get-ZhidaoQrObservation $script:activeQrToken
+            if (-not $script:lastQrStatus) {
+                $script:lastQrStatus = switch ($code) {
+                    0 { 'verified' }
+                    4 { 'unavailable' }
+                    7 { 'rejected' }
+                    9 { 'cancelled' }
+                    default { 'failed' }
+                }
+            }
+            (Control 'SyncMessageText').Text = switch ($code) {
+                0 { '扫码和 CAS 登录认证成功。正在核对本人课程接口状态。' }
+                4 { '扫码已确认、凭证已保存，但认证服务器暂不可用。请稍后点击连接诊断，无需立即重新扫码。' }
+                7 { '扫码确认后，官方 CAS 服务器仍未建立有效会话。旧登录凭证保留；请检查账号和网络后重试。' }
+                9 { '二维码登录已取消。旧凭证未修改。' }
+                default { '二维码登录流程失败（诊断码 ' + $code + '）。请检查网络及代理设置。' }
+            }
         } elseif ($action -eq 'play-ai') {
             (Control 'SyncMessageText').Text = if ($code -eq 0) {
                 'ZHS 原版任务已经结束（退出码 0）。这只能确认命令正常退出，不代表服务器已经计入学习记录；请查看只读进度核验。'
@@ -354,6 +392,15 @@ function Check-TaskExit {
     } catch {
         (Control 'SyncMessageText').Text = '无法确认命令执行结果，请使用连接诊断或重新启动软件。'
     } finally {
+        if ($script:activeTaskAction -eq 'login') {
+            $script:activeQrToken = ''
+            if ($null -ne $script:qrViewerImage) { $script:qrViewerImage.Source = $null }
+            Update-ZhidaoQrView
+            # The GUI has consumed final sanitized status; clean per-attempt file.
+            if ($finishedQrToken -match '^[0-9a-f]{32}$') {
+                Remove-Item -LiteralPath (Join-Path $script:root ('monitor-qr-' + $finishedQrToken + '.json')) -Force -ErrorAction SilentlyContinue
+            }
+        }
         $script:activeTaskProcess = $null
         $script:activeTaskAction = ''
         $script:activeTaskCourse = $null
@@ -1082,8 +1129,11 @@ $modeSelector.Add_SelectionChanged({
 (Control 'BtnInputCookies').Add_Click({ Import-CookiesFromTextDialog })
 (Control 'BtnDiagnose').Add_Click({ Start-Task 'doctor' })
 (Control 'BtnQR').Add_Click({
-    if (Test-Path -LiteralPath $script:qrPath -PathType Leaf) { Start-Process -FilePath $script:qrPath }
-    else { Notice '二维码尚未生成。请先点击扫码登录，等待命令窗口生成二维码。' }
+    if ($script:activeTaskAction -eq 'login' -and $script:activeQrToken) {
+        Show-ZhidaoQrDialog
+    } else {
+        Notice '请先点击“扫码登录”启动新会话。旧二维码不会重复显示。'
+    }
 })
 (Control 'BtnDataFolder').Add_Click({
     if (-not (Test-Path -LiteralPath $script:dataDir)) { New-Item -ItemType Directory -Path $script:dataDir -Force | Out-Null }
@@ -1128,7 +1178,7 @@ $script:monitorTimer.Add_Tick({ if ($null -ne $script:monitorCourse) { Launch-Ve
 $script:timer = New-Object System.Windows.Threading.DispatcherTimer
 $script:timer.Interval = [TimeSpan]::FromSeconds(3)
 $script:timer.Add_Tick({
-    try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache; Update-HeartbeatPanel } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
+    try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache; Update-HeartbeatPanel; Update-ZhidaoQrView } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
 })
 $script:window.Add_Closing({
     param($sender, $eventArgs)

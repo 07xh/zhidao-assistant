@@ -31,7 +31,13 @@ class LoginDisplayTests(unittest.TestCase):
         block = GUI.split("function Check-TaskExit {", 1)[1].split("function Get-SessionFingerprint", 1)[0]
         self.assertIn("$autoCheckAfterLogin = ($code -eq 0)", block)
         self.assertIn("if ($autoCheckAfterLogin) { Start-Task 'doctor' }", block)
-        self.assertIn("正在自动检测服务端登录状态", block)
+        self.assertIn("扫码和 CAS 登录认证成功。正在核对本人课程接口状态。", block)
+        self.assertIn("认证服务器暂不可用", block)
+        self.assertIn("旧登录凭证保留", block)
+        helper = (Path(__file__).parent / "payload" / "ZHS-QRLogin.py").read_text("utf-8")
+        self.assertIn("verify_session(session)", helper)
+        self.assertIn("save_cookies_atomic(destination, session.cookies)", helper)
+        self.assertIn("if status == SessionStatus.EXPIRED:", helper)
         self.assertNotIn("登录成功（退出码 0）", block)
 
     def test_home_login_label_is_no_longer_frozen(self):

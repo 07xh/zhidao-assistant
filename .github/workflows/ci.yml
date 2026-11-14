@@ -91,6 +91,9 @@ jobs:
       - name: Test ownership-scoped old version and installer residue cleanup
         shell: powershell
         run: .\\test_legacy_cleanup.ps1
+      - name: Test QR login WPF lifecycle and stale-token isolation
+        shell: powershell
+        run: .\\test_qr_login_wpf.ps1
       - name: Test login state module with fake local cookies
         shell: powershell
         run: .\\test_session_state.ps1

@@ -68,7 +68,7 @@ function Remove-ZhidaoOldAppResidue {
         if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
         $name = $item.Name
         $orphan = (
-            $name -cmatch '^monitor-(zhs|playback)-[0-9a-f]{32}\.json$' -or
+            $name -cmatch '^monitor-(zhs|playback|qr)-[0-9a-f]{32}\.json$' -or
             $name -cmatch '^monitor-(write|old)-[0-9a-f]{32}\.(tmp|bak)$' -or
             $name -ceq 'pending-verify.json.tmp'
         )
