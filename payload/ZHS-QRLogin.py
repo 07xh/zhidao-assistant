@@ -88,7 +88,7 @@ def save_cookies_atomic(destination: Path, cookies) -> None:
                 pass
 
 
-def login_with_qr(config, session, observation: LoginObservation, data_dir: Path) -> int:
+def _run_login_with_qr(config, session, observation: LoginObservation, data_dir: Path) -> int:
     """0 verified, 4 verification unavailable, 7 rejected, 5 local/QR failure."""
     from zhs.api.session_auth import SessionStatus, verify_session
     from zhs.login import LoginManager
@@ -183,6 +183,25 @@ def login_with_qr(config, session, observation: LoginObservation, data_dir: Path
     observation.record("unavailable")
     print("[QR_AUTH_UNAVAILABLE] 扫码已确认、凭证已保存，但服务器认证检查暂不可用。请稍后运行连接诊断。")
     return 4
+
+
+def login_with_qr(config, session, observation: LoginObservation, data_dir: Path) -> int:
+    """Run one QR attempt, then erase the ephemeral QR on EVERY exit path.
+
+    Only qrcode.png is removed. The cookies.json and persistent config remain
+    untouched; the final sanitized status stays available for the GUI.
+    """
+    qr_path = data_dir / "qrcode.png"
+    try:
+        return _run_login_with_qr(config, session, observation, data_dir)
+    finally:
+        try:
+            # unlink() removes a link itself, never follows it. Do not recurse.
+            qr_path.unlink(missing_ok=True)
+        except OSError:
+            # The GUI also retries removal after the child exits, so a
+            # temporary file lock does not silently preserve this QR.
+            print("[QR_CLEANUP_WARNING] 二维码临时图片未能删除，主程序将再次清理。")
 
 
 def main(argv: list[str] | None = None) -> int:
