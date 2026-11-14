@@ -139,7 +139,7 @@ class QrLoginTests(unittest.TestCase):
         self.assertIn("Show-ZhidaoQrDialog", gui)
         self.assertIn('x:Name="QrLoginStateText"', ui)
         self.assertNotIn("Start-Process -FilePath $script:qrPath", gui)
-        self.assertIn("Remove-Item -LiteralPath $script:qrPath -Force -ErrorAction Stop", gui)
+        self.assertIn("Clear-ZhidaoQrImage $script:qrPath", gui)
         self.assertIn("if ($script:activeTaskAction -eq 'login')", gui)
 
 
