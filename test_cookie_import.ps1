@@ -1,4 +1,4 @@
-# Offline Windows PowerShell 5.1 contract tests; only synthetic Cookie strings are used.
+﻿# Offline Windows PowerShell 5.1 contract tests; only synthetic Cookie strings are used.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'payload\CookieImport.ps1')
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ('zhs-cookie-test-' + [guid]::NewGuid().ToString('N'))
