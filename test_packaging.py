@@ -30,8 +30,11 @@ class InstallerPackagingTests(unittest.TestCase):
         self.assertIn("ZhidaoAssistant.exe", names)
         self.assertIn("Patch-ZHS-0.1.5.py", names)
         install_script = (PAYLOAD / INSTALLER_SCRIPT).read_text("utf-8-sig")
-        self.assertIn("Get-Content -LiteralPath $manifestFile", install_script)
-        self.assertIn("ConvertFrom-Json", install_script)
+        self.assertIn("Read-InstallerResourceManifest $manifestFile", install_script)
+        self.assertIn("ConvertFrom-Json -InputObject $raw", install_script)
+        self.assertIn("Installer preflight:", install_script)
+        self.assertLess(install_script.index("Read-InstallerResourceManifest $manifestFile"),
+                        install_script.index("Stop-ZhidaoAppProcesses -InstallRoot $root"))
         self.assertNotIn("$files = @('ZhidaoAssistant.exe'", install_script)
 
     def test_unlisted_payload_is_rejected_not_silently_published(self):
