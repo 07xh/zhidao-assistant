@@ -1211,6 +1211,17 @@ $modeSelector.Add_SelectionChanged({
 $script:monitorTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:monitorTimer.Interval = [TimeSpan]::FromSeconds(120)
 $script:monitorTimer.Add_Tick({ if ($null -ne $script:monitorCourse) { Launch-Verify $true } })
+# QR image updates must not wait for the general three-second course UI cycle.
+# A lightweight timer reads only the current-login state and PNG metadata.
+$script:qrTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:qrTimer.Interval = [TimeSpan]::FromMilliseconds(750)
+$script:qrTimer.Add_Tick({
+    if ($script:activeQrToken -and $null -ne $script:qrViewer) {
+        try { Update-ZhidaoQrView } catch {
+            (Control 'QrLoginStateText').Text = '二维码界面刷新异常，请查看扫码任务窗口的诊断代码'
+        }
+    }
+})
 $script:timer = New-Object System.Windows.Threading.DispatcherTimer
 $script:timer.Interval = [TimeSpan]::FromSeconds(3)
 $script:timer.Add_Tick({
@@ -1252,11 +1263,17 @@ $script:window.Add_Closing({
         }
     }
 })
-$script:window.Add_Closed({ $script:timer.Stop(); $script:monitorTimer.Stop(); Save-PendingVerify })
+$script:window.Add_Closed({
+    $script:qrTimer.Stop()
+    $script:timer.Stop()
+    $script:monitorTimer.Stop()
+    Save-PendingVerify
+})
 Refresh-Cache -Force
 Load-PendingVerify
 Show-Page 'home'
 Update-UiLayout
 Update-LoginPresentation
+$script:qrTimer.Start()
 $script:timer.Start()
 [void]$script:window.ShowDialog()
