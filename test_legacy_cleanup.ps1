@@ -38,7 +38,7 @@ try {
             throw ('User data or runtime deleted during upgrade: ' + $file)
         }
     }
-    if (Test-Path $oldMonitor -or Test-Path $oldQRStatus) { throw 'Expired monitor or QR status file was not cleaned' }
+    if ((Test-Path -LiteralPath $oldMonitor) -or (Test-Path -LiteralPath $oldQRStatus)) { throw 'Expired monitor or QR status file was not cleaned' }
     if (-not (Test-Path $freshMonitor)) { throw 'Fresh active monitor file was removed' }
     if (-not (Test-Path (Join-Path $other 'ZHS-GUI.ps1'))) { throw 'Different app was modified' }
 
