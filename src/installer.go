@@ -50,7 +50,7 @@ func install() error {
     defer os.RemoveAll(tempRoot)
     if err := unpackInto(tempRoot); err != nil { return err }
     script := filepath.Join(tempRoot, "Install.ps1")
-    fmt.Println("正在安装知到学习助手 V5.2.8（仅知到 App）")
+    fmt.Println("正在安装知到学习助手 V5.2.9 Beta 1（仅知到 App）")
     fmt.Println("将安装到当前 Windows 用户目录，无需管理员权限。")
     fmt.Println("首次安装需要联网下载运行环境和 ZHS 0.1.5；每一步的下载日志会在窗口显示。")
     fmt.Println("如果下载进度长期为零，记录停留的 [1/4]-[4/4] 阶段和网络错误。")
