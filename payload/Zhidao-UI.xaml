@@ -45,7 +45,7 @@
       <!-- Detail view -->
       <Grid x:Name="PageDetail" Grid.Row="1" Visibility="Collapsed" Margin="28,26,28,20"><Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Border Style="{StaticResource CardStyle}" Padding="0"><DockPanel><TextBlock Text="选择课程" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="18,18,18,10"/><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="CourseListPanel" Margin="10,0,10,10"/></ScrollViewer></DockPanel></Border>
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock x:Name="DetailTitleText" Text="选择左侧课程查看学习项目" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="DetailMetaText" Text="只展示上次成功同步的服务器学习记录" Grid.Row="1" Foreground="#718096" FontSize="12" Margin="0,8,0,16" TextWrapping="Wrap"/><StackPanel Grid.Row="2" Margin="0,0,0,14">
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock x:Name="DetailTitleText" Text="选择左侧课程查看学习项目" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="DetailMetaText" Text="只展示上次成功同步的服务器学习记录" Grid.Row="1" Foreground="#718096" FontSize="12" Margin="0,8,0,16" TextWrapping="Wrap"/><StackPanel Grid.Row="2" Margin="0,0,0,14">
           <TextBlock Text="播放 / 心跳模式" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,7"/>
           <ComboBox x:Name="PlaybackModeSelector" Width="290" Height="34" HorizontalAlignment="Left" Margin="0,0,0,10" SelectedIndex="0">
             <ComboBoxItem Content="官方网页 · 真实观看心跳"/>
@@ -107,7 +107,7 @@
               </StackPanel>
             </StackPanel>
           </Border>
-          <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="VideoListPanel"/></ScrollViewer></Grid></Border>
+          <StackPanel Grid.Row="4" x:Name="VideoListPanel"/></Grid></ScrollViewer></Border>
       </Grid>
       <!-- Settings view -->
       <ScrollViewer x:Name="PageSettings" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel Margin="28,26,28,28"><TextBlock Text="账号与隐私" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
