@@ -24,6 +24,7 @@ try {
         $previousManifest,[Text.UTF8Encoding]::new($false))
     New-Item -ItemType Directory -Path (Join-Path $installRoot '.venv') -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $installRoot '.venv\user.txt'),'private runtime fixture')
+    Assert-ZhidaoSafeUninstallTree -InstallRoot $installRoot
     $live = @('ZhidaoAssistant.exe','Zhidao-GUI.ps1','install-files.json','LegacyCleanup.ps1')
     $old = Get-ZhidaoRetiredFiles -InstallRoot $installRoot -CurrentFiles $live
     if ($old -isnot [array] -or $old.Count -ne 3) {
