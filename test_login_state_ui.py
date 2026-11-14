@@ -42,5 +42,21 @@ class LoginDisplayTests(unittest.TestCase):
         self.assertNotIn("function Update-LoginState {", GUI)
 
 
+    def test_direct_cookie_text_login_never_logs_or_echoes_secret(self):
+        import_xml = (Path(__file__).parent / "payload" / "Zhidao-UI.xaml").read_text("utf-8-sig")
+        cookie_module = (Path(__file__).parent / "payload" / "CookieImport.ps1").read_text("utf-8-sig")
+        self.assertIn('x:Name="BtnInputCookies"', import_xml)
+        self.assertIn("function Import-CookiesFromTextDialog {", GUI)
+        self.assertIn("New-Object System.Windows.Controls.PasswordBox", GUI)
+        self.assertIn("$secret.Clear()", GUI)
+        self.assertIn("Convert-ZhidaoCookieText $secret.Password", GUI)
+        self.assertIn("Submit-ZhidaoCookieImport $json", GUI)
+        self.assertIn("function Convert-ZhidaoCookieText", cookie_module)
+        self.assertIn("domain = '.zhihuishu.com'", cookie_module)
+        self.assertIn("return Convert-ZhidaoCookieJson", cookie_module)
+        self.assertIn("Start-Task 'doctor'", GUI)
+
+
+
 if __name__ == "__main__":
     unittest.main()

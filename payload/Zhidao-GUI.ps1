@@ -1,4 +1,4 @@
-﻿# 知到学习助手 V5.2.9 Beta 1 · 官方 WebView2 播放 + 双模式读取。
+﻿# 知到学习助手 V5.2.9 Beta 2 · 官方 WebView2 播放 + 双模式读取。
 # 保留 ZHS 0.1.5 的登录和 V3 的 zhidao_only.py 数据读取适配器。
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework
@@ -129,24 +129,29 @@ function Any-TaskActive {
 . (Join-Path $script:root 'SessionState.ps1')
 . (Join-Path $script:root 'CookieImport.ps1')
 
-function Import-CookiesFromDialog {
+function Test-CookieImportAllowed {
     if (Any-TaskActive -or $null -ne $script:activeTaskProcess -or $script:cookieImportActive) {
         Notice '已有登录、同步或 Cookie 核验任务正在运行；请先结束该任务。'
-        return
+        return $false
     }
     if ($null -ne $script:pendingVerifyCourse) {
         Notice '已有课程等待服务器核验；请先完成该项核验再切换账号。'
-        return
+        return $false
     }
     if ($null -ne $script:playerProcess) {
         try {
             $script:playerProcess.Refresh()
             if (-not $script:playerProcess.HasExited) {
                 Notice '请先关闭官方播放窗口，再导入另一账号的 Cookie。'
-                return
+                return $false
             }
         } catch { }
     }
+    return $true
+}
+
+function Import-CookiesFromDialog {
+    if (-not (Test-CookieImportAllowed)) { return }
     $picker = New-Object Microsoft.Win32.OpenFileDialog
     $picker.Title = '选择本人已授权的 ZHS cookies.json'
     $picker.Filter = 'ZHS Cookie 文件 (*.json)|*.json'
@@ -163,17 +168,82 @@ function Import-CookiesFromDialog {
     if ($yes -ne [System.Windows.MessageBoxResult]::Yes) { return }
     try {
         $json = Read-ZhidaoCookieImport $picker.FileName
+        Submit-ZhidaoCookieImport $json
+    } catch {
+        Notice 'Cookie 文件格式错误；仅支持 ZHS 0.1.5 JSON Cookie 列表。不会输出任何凭证内容。'
+    }
+}
+
+function Import-CookiesFromTextDialog {
+    if (-not (Test-CookieImportAllowed)) { return }
+    $dialog = New-Object System.Windows.Window
+    $dialog.Title = '输入本人知到 Cookie'
+    $dialog.Width = 620
+    $dialog.Height = 290
+    $dialog.MinWidth = 480
+    $dialog.ResizeMode = [System.Windows.ResizeMode]::CanMinimize
+    $dialog.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterOwner
+    $dialog.Owner = $script:window
+    $dialog.FontFamily = New-Object System.Windows.Media.FontFamily('Microsoft YaHei UI')
+    $stack = New-Object System.Windows.Controls.StackPanel
+    $stack.Margin = New-Object System.Windows.Thickness(22)
+    $info = New-Object System.Windows.Controls.TextBlock
+    $info.Text = '直接粘贴本人知到站点的 Cookie 字符串（可带 Cookie: 前缀），或者 ZHS JSON 数组。内容会隐藏显示，仅在本机处理；不能保证所有浏览器 Cookie 都适用。'
+    $info.TextWrapping = [System.Windows.TextWrapping]::Wrap
+    $info.Margin = New-Object System.Windows.Thickness(0,0,0,12)
+    $stack.Children.Add($info) | Out-Null
+    $secret = New-Object System.Windows.Controls.PasswordBox
+    $secret.MaxLength = 262144
+    $secret.MinHeight = 48
+    $secret.Margin = New-Object System.Windows.Thickness(0,0,0,12)
+    $stack.Children.Add($secret) | Out-Null
+    $notice = New-Object System.Windows.Controls.TextBlock
+    $notice.Text = '登录前会二次核验服务器；失败时尝试恢复旧 Cookie。凭证仍按 ZHS 原格式保存为本机明文文件。请不要在聊天或 GitHub 粘贴 Cookie。'
+    $notice.TextWrapping = [System.Windows.TextWrapping]::Wrap
+    $notice.Margin = New-Object System.Windows.Thickness(0,0,0,12)
+    $stack.Children.Add($notice) | Out-Null
+    $actions = New-Object System.Windows.Controls.StackPanel
+    $actions.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+    $actions.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Right
+    $cancel = New-Object System.Windows.Controls.Button
+    $cancel.Content = '取消'
+    $cancel.Width = 90
+    $cancel.Margin = New-Object System.Windows.Thickness(0,0,10,0)
+    $confirm = New-Object System.Windows.Controls.Button
+    $confirm.Content = '验证并登录'
+    $confirm.Width = 112
+    $confirm.IsDefault = $true
+    $actions.Children.Add($cancel) | Out-Null
+    $actions.Children.Add($confirm) | Out-Null
+    $stack.Children.Add($actions) | Out-Null
+    $dialog.Content = $stack
+    $cancel.Add_Click({ $dialog.DialogResult = $false })
+    $confirm.Add_Click({ $dialog.DialogResult = $true })
+    try {
+        if ($dialog.ShowDialog() -ne $true) { return }
+        $json = Convert-ZhidaoCookieText $secret.Password
+        $secret.Clear()
+        Submit-ZhidaoCookieImport $json
+    } catch {
+        Notice '输入的 Cookie 格式无效或无法启动验证。仅支持来自本人知到站点的 Cookie 请求头或 ZHS JSON；不会显示输入内容。'
+    } finally {
+        $secret.Clear()
+    }
+}
+
+function Submit-ZhidaoCookieImport([string]$json) {
+    try {
         Begin-ZhidaoCookieImport $json
         Start-Task 'doctor'
         if ($script:activeTaskAction -ne 'doctor' -or $null -eq $script:activeTaskProcess) {
             $resultMessage = Complete-ZhidaoCookieImport $null
             Notice ('无法启动服务端诊断。' + $resultMessage)
         } else {
-            (Control 'SyncMessageText').Text = '已读取本机 Cookie 文件，正在只读检测服务器登录；核验完成前请勿关闭软件。'
+            (Control 'SyncMessageText').Text = '正在验证本人 Cookie 的服务器登录状态；完成前请勿关闭软件。'
         }
     } catch {
         if ($script:cookieImportActive) { $null = Complete-ZhidaoCookieImport $null }
-        Notice 'Cookie 导入被拒绝或写入失败。仅支持知到域名下的 ZHS JSON Cookie 列表，请检查文件格式与权限；没有输出敏感内容。'
+        Notice '登录凭证写入失败或无法验证，请使用扫码登录或检查当前本机用户目录权限。'
     }
 }
 
@@ -955,6 +1025,7 @@ $modeSelector.Add_SelectionChanged({
 (Control 'BtnSyncProgress').Add_Click({ Start-Task 'progress' })
 (Control 'BtnLogin').Add_Click({ Start-Task 'login' })
 (Control 'BtnImportCookies').Add_Click({ Import-CookiesFromDialog })
+(Control 'BtnInputCookies').Add_Click({ Import-CookiesFromTextDialog })
 (Control 'BtnDiagnose').Add_Click({ Start-Task 'doctor' })
 (Control 'BtnQR').Add_Click({
     if (Test-Path -LiteralPath $script:qrPath -PathType Leaf) { Start-Process -FilePath $script:qrPath }

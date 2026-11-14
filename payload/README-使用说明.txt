@@ -62,3 +62,6 @@ V5.2.9 Beta 1 · 可选 Cookie 文件登录
 - Cookie 为敏感凭证，仍由原版 ZHS 明文保存，不要分享或上传到 GitHub。
 - 原扫码登录与官方 WebView2 网页独立登录均继续保留。
 - 这是未经真实 Windows 知到账号/学习进度验收的预发布版本。请查看 CHANGELOG-V5.2.9-beta.1.md。
+
+V5.2.9 Beta 2：新增设置页「直接输入 Cookie」，在遮蔽输入框粘贴本人知到的 Cookie 请求头或 ZHS JSON，软件会本地转换并检测服务器登录。原「导入 Cookie 文件」和「扫码登录」保留。不需要先准备 cookies.json 文件。
+本地 ZHS 仍明文保存 Cookie；切勿将 Cookie 贴到聊天、GitHub 或日志。真实 Windows/知到账号需另行验收。

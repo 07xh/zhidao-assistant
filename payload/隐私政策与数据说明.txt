@@ -49,3 +49,6 @@ WebView2 SDK 来自官方 NuGet 固定版本，Windows WebView2 Runtime 由 Micr
 12. V5.2.9 Beta 1 · 从本机导入已有 ZHS Cookie 文件
 用户可自主从本人电脑选择 ZHS 0.1.5 cookies.json，程序在本机检查格式、知到 Cookie 域名、大小和字段，替换本地登录 Cookie 后以只读请求检查服务器是否认可当前登录。检查无法确认登录时尝试恢复导入前的 Cookie。软件不读取浏览器的其他 Cookie、不上传凭证到开发者服务器、不索取账号密码。Cookie 仍按 ZHS 上游格式以明文保存在当前 Windows 用户的 .zhs 目录；本机导入前有明确的二次确认。
 这项功能仅支持 ZHS 文件格式，不代表能将浏览器中的任意 Cookie 文本用于登录。用户可以选择继续使用扫码登录。
+
+13. V5.2.9 Beta 2 · 用户在本机直接输入 Cookie
+新增 Windows 设置页遮蔽输入框，可由本人主动粘贴知到站点 Cookie 请求头字符串或 ZHS JSON。程序在内存中解析并按 ZHS 原格式写入当前 Windows 用户目录，再由原有 ZHS 服务端只读接口核验登录；若未确认则尝试回滚原凭证。输入不会发到开发者自建服务或写入 GUI 日志；但 ZHS 上游仍将 Cookie 明文保存在本机，用户必须保护该文件。文件导入和扫码登录仍保留。

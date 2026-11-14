@@ -9,7 +9,7 @@ $root = Join-Path $env:LOCALAPPDATA 'ZHSDesktop'
 $venv = Join-Path $root '.venv'
 $uv = Join-Path $root 'uv.exe'
 $zhs = Join-Path $venv 'Scripts\zhs.exe'
-Write-Host '== Zhidao Assistant V5.2.9 Beta 1 Installer (test release) ==' -ForegroundColor Cyan
+Write-Host '== Zhidao Assistant V5.2.9 Beta 2 Installer (test release) ==' -ForegroundColor Cyan
 Write-Host 'Uses official pjm314159/zhs version 0.1.5; reads Zhidao shared courses and AI smart courses.'
 if (-not [Environment]::Is64BitOperatingSystem) { throw 'Windows 10/11 x64 is required.' }
 New-Item -ItemType Directory -Path $root -Force | Out-Null
@@ -290,7 +290,7 @@ $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $des
 $shortcut.TargetPath = Join-Path $root 'ZhidaoAssistant.exe'
 $shortcut.Arguments = ''
 $shortcut.WorkingDirectory = $env:USERPROFILE
-$shortcut.Description = '知到 App 官方 WebView2 播放工具 V5.2.9 Beta 1（WPF）'
+$shortcut.Description = '知到 App 官方 WebView2 播放工具 V5.2.9 Beta 2（WPF）'
 $shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,70"
 $shortcut.Save()
 # Register per-user uninstall entry in Windows Apps & Features (no administrator rights).
@@ -305,6 +305,6 @@ $uninstallLine = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + (
 New-ItemProperty -Path $regKey -Name UninstallString -Value $uninstallLine -PropertyType String -Force | Out-Null
 New-ItemProperty -Path $regKey -Name NoModify -Value 1 -PropertyType DWord -Force | Out-Null
 New-ItemProperty -Path $regKey -Name NoRepair -Value 1 -PropertyType DWord -Force | Out-Null
-Write-Host 'SUCCESS. Desktop shortcut: 知到学习助手 V5.2.9 Beta 1 (Windows test build)' -ForegroundColor Green
+Write-Host 'SUCCESS. Desktop shortcut: 知到学习助手 V5.2.9 Beta 2 (Windows test build)' -ForegroundColor Green
 Write-Host 'ZHS data directory:' (Join-Path $env:USERPROFILE '.zhs')
 Write-Host 'Login cookies stay in %USERPROFILE%\.zhs. The new privacy notice must be accepted at first launch.'

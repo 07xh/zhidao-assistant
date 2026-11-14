@@ -9,8 +9,19 @@ function Read-ZhidaoCookieImport([string]$SourcePath) {
     $decoder = [System.Text.UTF8Encoding]::new($false, $true)
     $raw = [System.IO.File]::ReadAllText($SourcePath, $decoder)
     if (-not $raw.TrimStart().StartsWith('[')) { throw 'NOT_ZHS_JSON' }
-    try { $rows = @(ConvertFrom-Json -InputObject $raw -ErrorAction Stop) }
-    catch { throw 'INVALID_JSON' }
+    return Convert-ZhidaoCookieJson $raw
+}
+
+function Convert-ZhidaoCookieJson([string]$raw) {
+    if ([string]::IsNullOrWhiteSpace($raw) -or $raw.Length -gt 262144 -or
+        -not $raw.TrimStart().StartsWith('[')) { throw 'INVALID_JSON' }
+    try {
+        $decoded = ConvertFrom-Json -InputObject $raw -ErrorAction Stop
+        # Windows PowerShell 5.1 can emit a JSON array as one nested result.
+        # Enumerate the decoded object explicitly before validating rows.
+        $rows = @()
+        foreach ($item in $decoded) { $rows += $item }
+    } catch { throw 'INVALID_JSON' }
     if ($rows.Count -lt 1 -or $rows.Count -gt 250) { throw 'COOKIE_COUNT' }
     $items = New-Object 'System.Collections.Generic.List[object]'
     $seen = @{}
@@ -46,6 +57,46 @@ function Read-ZhidaoCookieImport([string]$SourcePath) {
         $seen[$key] = $true
         $items.Add([ordered]@{ name = $name; value = $value; domain = $domain; path = $path })
     }
+    return (ConvertTo-Json -InputObject $items.ToArray() -Compress -Depth 4)
+}
+
+function Convert-ZhidaoCookieText([string]$inputText) {
+    # Accept either a local ZHS JSON array or a single browser Cookie request-header value.
+    # Do not echo inputText, include it in exceptions, or store it outside the ZHS file.
+    if ([string]::IsNullOrWhiteSpace($inputText) -or $inputText.Length -gt 262144) {
+        throw 'INVALID_TEXT_LENGTH'
+    }
+    $trimmed = $inputText.Trim()
+    if ($trimmed.StartsWith('[')) { return Convert-ZhidaoCookieJson $trimmed }
+    if ($trimmed -match '[\r\n]') { throw 'INVALID_MULTILINE_COOKIE' }
+    if ($trimmed -match '^(?i:Cookie):\s*') {
+        $trimmed = $trimmed -replace '^(?i:Cookie):\s*', ''
+    }
+    $pairs = $trimmed.Split(';')
+    if ($pairs.Count -lt 1 -or $pairs.Count -gt 250) { throw 'COOKIE_COUNT' }
+    $items = New-Object 'System.Collections.Generic.List[object]'
+    $seenNames = @{}
+    foreach ($segment in $pairs) {
+        $part = $segment.Trim()
+        $position = $part.IndexOf('=')
+        if ($position -lt 1) { throw 'INVALID_COOKIE_PAIR' }
+        $name = $part.Substring(0, $position).Trim()
+        $value = $part.Substring($position + 1).Trim()
+        if ($name.Length -gt 256 -or
+            $name -notmatch "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$" -or
+            $value.Length -gt 8192 -or $value -match '[\r\n]') {
+            throw 'INVALID_COOKIE_PAIR'
+        }
+        # A pasted request header has no domain or path metadata. Restrict it
+        # to the first-party Zhihuishu cookie scope; the server must verify login.
+        if ($seenNames.ContainsKey($name)) { throw 'DUPLICATE_COOKIE' }
+        $seenNames[$name] = $true
+        $items.Add([pscustomobject]@{
+            name = [string]$name; value = [string]$value; domain = '.zhihuishu.com'; path = '/'
+        })
+    }
+    # The text fields are already validated; serialize them directly to avoid
+    # Windows PowerShell 5.1 treating a re-parsed property as a nonstring value.
     return (ConvertTo-Json -InputObject $items.ToArray() -Compress -Depth 4)
 }
 
