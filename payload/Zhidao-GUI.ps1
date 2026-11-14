@@ -1189,7 +1189,36 @@ $script:window.Add_Closing({
     param($sender, $eventArgs)
     if ($script:cookieImportActive) {
         $eventArgs.Cancel = $true
-        Notice 'Cookie 登录仍在服务器核验中。为保护原登录态，请先等待本次核验结果。'
+        Notice 'Cookie 登录仍在服务器核验中。为保护原登录态，请先结束本次核验。'
+        return
+    }
+    if ($script:activeTaskAction -eq 'login' -and $null -ne $script:activeTaskProcess) {
+        # The login task is a separate console process. Allowing the GUI to
+        # disappear while it is still polling would lose the fallback cleanup
+        # observer and leave a valid QR visible on disk.
+        try {
+            $script:activeTaskProcess.Refresh()
+            if (-not $script:activeTaskProcess.HasExited) {
+                $eventArgs.Cancel = $true
+                Notice '扫码登录任务仍在运行。请先关闭扫码登录命令窗口，再退出主程序，以便清除二维码。'
+                return
+            }
+        } catch {
+            $eventArgs.Cancel = $true
+            Notice '无法确认扫码登录任务是否已结束。请先关闭扫码命令窗口，再退出主程序。'
+            return
+        }
+        # Process already exited, but the 3-second UI timer has not consumed
+        # its result. Cleanup the QR without starting a new doctor task.
+        if ($null -ne $script:qrViewerImage) { $script:qrViewerImage.Source = $null }
+        if (-not (Clear-ZhidaoQrImage $script:qrPath)) {
+            $eventArgs.Cancel = $true
+            Notice '二维码临时图片无法删除。请关闭仍在使用该图片的窗口后再退出。'
+            return
+        }
+        if ($script:activeQrToken -match '^[0-9a-f]{32}$') {
+            Remove-Item -LiteralPath (Join-Path $script:root ('monitor-qr-' + $script:activeQrToken + '.json')) -Force -ErrorAction SilentlyContinue
+        }
     }
 })
 $script:window.Add_Closed({ $script:timer.Stop(); $script:monitorTimer.Stop(); Save-PendingVerify })
