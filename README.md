@@ -1,19 +1,26 @@
-# 知到学习助手 V5.2.8（Windows x64）
+# 知到学习助手 v5.2.9 Beta 1（Windows x64）
 
-**已发布测试版：** [v5.2.8-hotfix10](https://github.com/07xh/zhidao-assistant/releases/tag/v5.2.8-hotfix10)，二进制与 tag 保持原样。
+**下载：** [v5.2.9-beta.1 测试版](https://github.com/07xh/zhidao-assistant/releases/tag/v5.2.9-beta.1) · [发布说明](CHANGELOG-V5.2.9-beta.1.md) · [GitHub Actions](https://github.com/07xh/zhidao-assistant/actions/workflows/ci.yml)
 
-**当前 main：未发布开发版（v5.2.8-dev）。** 已实施共享安装资源白名单、隔离可重复 ZIP 打包、环境版本明确校验、同名课程失败记录身份隔离，并清理过时的发布工作流。进一步拆分为独立的 `SessionState.ps1`（GUI 登录状态）、`zhidao_diagnostics.py`（错误分类与脱敏）、`zhidao_courses.py`（课程身份及历史缓存策略），并增加 Windows 假 Cookie 状态测试。修改及未完成的技术债请查阅 [CODE-AUDIT.md](CODE-AUDIT.md)。开发版安装器可在最新成功的 [CI Actions](https://github.com/07xh/zhidao-assistant/actions/workflows/ci.yml) 运行记录中获取；它**不是**正式 Release，也未经真实 Windows/知到账号的端到端验收。
+本项目是非官方、面向个人学习的 Windows 工具（GPL-3.0-only）。软件保留 ZHS 0.1.5 的课程读取、进度查询与原版功能，并提供独立的官方 WebView2 视频窗口和服务器只读核验；**离线测试和安装包构建通过不等于真实知到账号/课程已验收**。
 
-**开发分支最新修复（尚未进入 Hotfix10 Release）：** 单课只读核验成功后，准确更新对应的失败标记；其他失败来源继续保留；首页在同步不完整或存在历史记录时隐藏总进度统计；历史完成状态显示为待核验。增加了异常脱敏和针对性离线测试。这些修改不涉及 ZHS 心跳生成/发送算法。可在 [GitHub Actions](https://github.com/07xh/zhidao-assistant/actions/workflows/ci.yml) 核对最新源码构建情况。最新可直接下载的 Release 仍为 Hotfix10，**并未包含这批开发分支修复**。
+## 登录方式
 
-**最新登录检测修复：** 扫码后自动进行只读服务端诊断；明确区分本地 Cookie 缺失/损坏、会话未确认与课程接口失败；最近一次登录验证状态随 Cookie 更换立即失效。详见 [Hotfix10 更新说明](CHANGELOG-HOTFIX10.md)。
+1. **官方知到 App 扫码（推荐）：** 设置与隐私 → 扫码登录，随后自动执行只读服务器诊断。
+2. **导入已有 ZHS Cookie：** 设置与隐私 → 导入 ZHS Cookie 文件，选择本人已有 ZHS 0.1.5 的 `cookies.json`（JSON 列表）。严格验证结构和知到域名后临时替换本地凭证，并自动检测服务器登录；登录未确认时尝试恢复旧凭证。不能直接粘贴浏览器 HTTP Cookie 字符串。
+3. **官方网页独立登录：** WebView2 内的官网 Cookie 保存在独立浏览器配置目录，与 ZHS 会话不共用。
 
-本版为 V5.2.7 的升级维护：再次运行安装器会自动结束属于当前用户同一个安装目录的旧版程序和播放器，然后就地替换程序文件、移除已知旧版启动脚本和更新卸载项。不会执行旧版本自带的卸载器，也不会删除 `.zhs` 登录数据或重建已有效的 Python/ZHS 虚拟环境。
+Cookie 文件属于敏感登录凭证，**请不要上传、发送或贴到 Issues**。ZHS 上游仍以明文 JSON 保存在 `%USERPROFILE%\.zhs\cookies.json`，请妥善保护本机账户。
 
-只处理 `%LOCALAPPDATA%\ZHSDesktop`：其他文件夹中的便携副本不会自动卸载。若无法可靠识别相关进程或程序文件仍被占用，会保留已有安装并显示错误，而不是结束无关进程。
+## 本次修复
 
-原有 V5.2.7 官方播放器、只读课程核验和 ZHS 0.1.5 依赖保持原样。本版仍未进行 Windows 真机升级/安装/卸载验收，不代表真实课程可用性已验证；首次安装可能需要联网下载依赖。
+- 将 ZHS 原版任务退出与课程服务器只读核验衔接；显示本地退出码但不把它误当作服务器进度成功。
+- 待核验课程绑定启动时的 ZHS 会话；旧格式、跨账号任务不再被当作当前账号数据。
+- 新增 Cookie 导入校验、原凭证回滚与 Windows PowerShell 回归测试。
+- 安装器原地升级且默认保留 `.zhs`、已存在的 Python/ZHS 运行环境；不另写模拟心跳执行器。
 
-开发版构建：`python build.py`（生成 `ZhidaoAssistant-Setup-v5.2.8-dev.exe`）。测试：`python -m unittest discover -v -p 'test_*.py'`、`node test_media_controller.cjs`；Windows 专项：`powershell -NoProfile -File test_session_state.ps1`。完整自动化检查见 `.github/workflows/ci.yml`。
+## 构建与验收
 
-本项目为非官方工具，GPL-3.0-only。
+本项目以 CI 为构建来源，`python build.py` 生成 `ZhidaoAssistant-Setup-v5.2.9-beta.1.exe`；测试包括 Python、JavaScript、Windows PowerShell 5.1 源码解析、模拟 Cookie 登录以及 Windows x64 安装器交叉编译。发布包不含代码签名，需参照 SHA-256 校验。
+
+**尚待本人 Windows 真机验收：** 安装/升级与登录、官方播放，以及平台真实记录的服务器端学习进度。保留 [上一测试版 v5.2.8-hotfix10](https://github.com/07xh/zhidao-assistant/releases/tag/v5.2.8-hotfix10) 供比较。
