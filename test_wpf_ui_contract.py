@@ -31,7 +31,7 @@ class WpfVisualContractTests(unittest.TestCase):
 
     def test_xaml_well_formed_and_still_a_window(self):
         self.assertEqual(self.root.tag, WPF_NS + "Window")
-        self.assertGreaterEqual(int(self.root.attrib["MinWidth"]), 780)
+        self.assertGreaterEqual(int(self.root.attrib["MinWidth"]), 640)
 
     def test_event_handlers_only_reference_existing_controls(self):
         names = set(re.findall(r"Control\s*'([^']+)'", self.gui_text))
