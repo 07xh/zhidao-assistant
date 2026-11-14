@@ -18,6 +18,7 @@ MONITOR_TOKEN = re.compile(r"^[0-9a-f]{32}$")
 STAGES = frozenset({
     "requesting", "ready", "scanned", "confirming",
     "verified", "unavailable", "rejected", "expired", "cancelled", "failed",
+    "environment-error",
 })
 
 
@@ -213,23 +214,27 @@ def login_with_qr(config, session, observation: LoginObservation, data_dir: Path
 
 
 def main(argv: list[str] | None = None) -> int:
-    from loguru import logger
-    from zhs.config import ConfigManager
-    from zhs.session import ZhsSession
-    from zhs.utils.path import get_data_dir
-
     args = sys.argv[1:] if argv is None else argv
     if len(args) != 1 or not MONITOR_TOKEN.fullmatch(args[0]):
         print("[QR_INVALID_ARGS] 缺少本次登录监控令牌。")
         return 2
+    observation = None
     try:
+        # Publish a pending state BEFORE importing third-party dependencies.
+        # If ZHS, loguru, or the local configuration is broken, WPF must not
+        # remain indefinitely at "not started" with no actionable diagnosis.
         observation = LoginObservation(args[0])
+        observation.record("requesting")
+        from loguru import logger
+        from zhs.config import ConfigManager
+        from zhs.session import ZhsSession
+        from zhs.utils.path import get_data_dir
+
         data_dir = get_data_dir()
         config = ConfigManager().load()
         config.qr.image_path = str(data_dir / "qrcode.png")
-        # Upstream QR poll warnings/debug may contain request URLs or one-time
-        # QR identifiers. Disable those handlers for this one login process;
-        # the wrapper emits only fixed, non-sensitive QR stage codes.
+        # Never output an upstream exception that could contain QR tokens,
+        # one-time passwords or cookies.
         logger.remove()
         session = ZhsSession(config)
         try:
@@ -237,7 +242,9 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             session.close()
     except Exception:
-        print("[QR_INIT_FAILED] 初始化官方 ZHS 扫码组件失败；请检查安装和本机环境。")
+        if observation is not None:
+            observation.record("environment-error")
+        print("[QR_INIT_FAILED] 初始化扫码组件失败；请检查已安装的 ZHS 依赖及本机配置。")
         return 5
 
 

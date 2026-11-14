@@ -3,6 +3,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -137,6 +138,28 @@ class QrLoginTests(unittest.TestCase):
         self.assertFalse((self.data / "qrcode.png").exists())
         self.assertIn("[QR_READY]", self.out.getvalue())
         self.assertIn("[QR_SCANNED]", self.out.getvalue())
+
+    def test_bootstrap_import_failure_is_reported_to_wpf(self):
+        token = "f" * 32
+        with patch.dict(os.environ, {"LOCALAPPDATA": str(self.root)}), \
+             patch.dict(sys.modules, {"zhs.config": None}), \
+             contextlib.redirect_stdout(self.out):
+            code = qr.main([token])
+        self.assertEqual(code, 5)
+        status_path = self.root / "ZHSDesktop" / ("monitor-qr-" + token + ".json")
+        self.assertEqual(json.loads(status_path.read_text())["stage"], "environment-error")
+        self.assertIn("[QR_INIT_FAILED]", self.out.getvalue())
+        self.assertNotIn("SECRET_COOKIE", self.out.getvalue())
+
+    def test_qr_refresh_has_separate_wpf_timer(self):
+        gui = (HERE / "payload" / "Zhidao-GUI.ps1").read_text(encoding="utf-8-sig")
+        view = (HERE / "payload" / "QrLoginView.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn("FromMilliseconds(750)", gui)
+        self.assertIn("$script:qrTimer.Start()", gui)
+        self.assertIn("$script:qrTimer.Stop()", gui)
+        self.assertIn("Get-ZhidaoFreshQrFile", view)
+        self.assertIn("[IO.MemoryStream]::new([byte[]]$bytes)", view)
+        self.assertIn("状态同步延迟", view)
 
     def test_gui_exit_during_active_qr_login_requires_process_state(self):
         gui = (HERE / "payload" / "Zhidao-GUI.ps1").read_text(encoding="utf-8-sig")
