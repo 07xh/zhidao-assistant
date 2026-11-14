@@ -15,8 +15,13 @@ function Read-ZhidaoCookieImport([string]$SourcePath) {
 function Convert-ZhidaoCookieJson([string]$raw) {
     if ([string]::IsNullOrWhiteSpace($raw) -or $raw.Length -gt 262144 -or
         -not $raw.TrimStart().StartsWith('[')) { throw 'INVALID_JSON' }
-    try { $rows = @(ConvertFrom-Json -InputObject $raw -ErrorAction Stop) }
-    catch { throw 'INVALID_JSON' }
+    try {
+        $decoded = ConvertFrom-Json -InputObject $raw -ErrorAction Stop
+        # Windows PowerShell 5.1 can emit a JSON array as one nested result.
+        # Enumerate the decoded object explicitly before validating rows.
+        $rows = @()
+        foreach ($item in $decoded) { $rows += $item }
+    } catch { throw 'INVALID_JSON' }
     if ($rows.Count -lt 1 -or $rows.Count -gt 250) { throw 'COOKIE_COUNT' }
     $items = New-Object 'System.Collections.Generic.List[object]'
     $seen = @{}
