@@ -8,6 +8,7 @@
   "Zhidao-UI.xaml",
   "Consent-UI.xaml",
   "Zhidao-Task.cmd",
+  "ZHS-ConsoleMonitor.py",
   "zhidao_only.py",
   "zhidao_diagnostics.py",
   "zhidao_courses.py",
