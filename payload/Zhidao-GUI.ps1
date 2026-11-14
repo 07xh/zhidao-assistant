@@ -1063,11 +1063,11 @@ function Show-Page([string]$page) {
     foreach ($entry in @(@('NavHome','home'),@('NavDetail','detail'),@('NavSettings','settings'))) {
         $btn = Control $entry[0]
         if ($page -eq $entry[1]) {
-            $btn.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#2F527A')
+            $btn.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#326FE5')
             $btn.Foreground = [System.Windows.Media.Brushes]::White
         } else {
             $btn.Background = [System.Windows.Media.Brushes]::Transparent
-            $btn.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#C9D6E9')
+            $btn.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#CAD7EE')
         }
     }
 }
