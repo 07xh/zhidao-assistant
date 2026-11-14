@@ -54,6 +54,15 @@ if not exist "%ZHS%" (
 )
 if "%~2"=="" goto badplayargs
 if "%~3"=="" goto badplayargs
+REM Optional console observer preserves original interactive output and reports
+REM only numeric progress. Missing observer falls back to the exact ZHS CLI.
+REM No retry is attempted after observer invocation.
+if "%~4"=="" goto originalplay
+if not exist "%ROOT%\ZHS-ConsoleMonitor.py" goto originalplay
+"%PY%" "%ROOT%\ZHS-ConsoleMonitor.py" "%~4" "%~2" "%~3"
+exit /b %ERRORLEVEL%
+
+:originalplay
 REM Legacy upstream ZHS 0.1.5 CLI. Request generation and sending remain untouched.
 "%ZHS%" play -c "%~2:%~3" --type ai
 exit /b %ERRORLEVEL%
