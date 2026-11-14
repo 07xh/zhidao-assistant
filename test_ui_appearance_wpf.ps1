@@ -33,9 +33,15 @@ try {
     if ([int]$rootGrid.ColumnDefinitions[0].Width.Value -ne 78) { throw 'Compact sidebar not enabled' }
     if ((Control 'SidebarBrandText').Visibility -ne 'Collapsed' -or
         (Control 'NavHome').Content -ne '▣') { throw 'Compact navigation is not accessible' }
+    $script:window.Width = 670
+    Update-UiLayout
+    if ([int](Control 'PageDetail').RowDefinitions[0].Height.Value -ne 118) { throw 'Narrow details did not stack' }
+    if ([System.Windows.Controls.Grid]::GetRow((Control 'DetailContentBorder')) -ne 1) { throw 'Detail content should move below course chooser' }
+    if ((Control 'BtnLoginShortcut').Content -ne '账号') { throw 'Narrow login shortcut did not shrink' }
     $script:window.Width = 1180
     Update-UiLayout
     if ([int]$rootGrid.ColumnDefinitions[0].Width.Value -ne 236) { throw 'Full sidebar did not restore' }
+    if ([System.Windows.Controls.Grid]::GetRow((Control 'DetailContentBorder')) -ne 0) { throw 'Full details did not restore columns' }
     if ((Control 'SidebarBrandText').Visibility -ne 'Visible' -or
         (Control 'NavHome').Content -notmatch '我的课程') { throw 'Full navigation was not restored' }
     Apply-UiTheme 'light'
