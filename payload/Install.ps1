@@ -13,6 +13,51 @@ Write-Host '== Zhidao Assistant V5.2.9 Beta 2 Installer (test release) ==' -Fore
 Write-Host 'Uses official pjm314159/zhs version 0.1.5; reads Zhidao shared courses and AI smart courses.'
 if (-not [Environment]::Is64BitOperatingSystem) { throw 'Windows 10/11 x64 is required.' }
 New-Item -ItemType Directory -Path $root -Force | Out-Null
+# Preflight the embedded file manifest BEFORE downloading dependencies or
+# changing the existing installation. ConvertFrom-Json via a pipeline may
+# produce a nested Object[] in Windows PowerShell 5.1; normalize explicitly.
+function Read-InstallerResourceManifest([string]$manifestFile) {
+    if (-not (Test-Path -LiteralPath $manifestFile -PathType Leaf)) {
+        throw 'Missing installer resource manifest.'
+    }
+    $raw = [System.IO.File]::ReadAllText($manifestFile, [System.Text.Encoding]::UTF8)
+    if ([string]::IsNullOrWhiteSpace($raw) -or -not $raw.TrimStart([char]0xFEFF, [char]' ', [char]13, [char]10, [char]9).StartsWith('[')) {
+        throw 'Invalid installer resource manifest.'
+    }
+    $manifestItems = ConvertFrom-Json -InputObject $raw -ErrorAction Stop
+    if ($null -eq $manifestItems -or $manifestItems -isnot [array]) {
+        throw 'Invalid installer resource manifest.'
+    }
+    $names = New-Object 'System.Collections.Generic.List[string]'
+    $seen = @{}
+    $invalidChars = [System.IO.Path]::GetInvalidFileNameChars()
+    foreach ($entry in $manifestItems) {
+        if ($entry -isnot [string] -or [string]::IsNullOrWhiteSpace($entry)) {
+            throw 'Invalid installer resource type or empty name.'
+        }
+        if ($entry -eq '.' -or $entry -eq '..' -or $entry.IndexOfAny($invalidChars) -ge 0 -or
+            $entry.Contains('/') -or $entry.Contains('\')) {
+            throw 'Invalid installer resource path.'
+        }
+        if ($seen.ContainsKey($entry)) { throw 'Duplicate installer resource name.' }
+        $seen[$entry] = $true
+        [void]$names.Add($entry)
+    }
+    if ($names.Count -lt 2 -or -not $seen.ContainsKey('ZhidaoAssistant.exe') -or
+        -not $seen.ContainsKey('install-files.json')) {
+        throw 'Invalid installer resource manifest.'
+    }
+    return $names.ToArray()
+}
+$manifestFile = Join-Path $sourceDir 'install-files.json'
+$files = @(Read-InstallerResourceManifest $manifestFile)
+# Reject missing files before stopping the app, changing dependencies or staging.
+foreach ($name in $files) {
+    if (-not (Test-Path -LiteralPath (Join-Path $sourceDir $name) -PathType Leaf)) {
+        throw ('Missing setup file: ' + $name)
+    }
+}
+Write-Host ('Installer preflight: ' + $files.Count + ' resources validated.') -ForegroundColor Green
 # Automatically close only process instances that belong to this exact per-user install.
 # Do not run an old Uninstall.ps1 here: it may remove login/runtime data or registry state.
 . (Join-Path $sourceDir 'AppLifecycle.ps1')
@@ -199,21 +244,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'ZHS init failed.' }
     }
 } finally { Pop-Location }
-# A single allowlist is shared by build.py and the installed app; no duplicate list.
-$manifestFile = Join-Path $sourceDir 'install-files.json'
-$files = @(Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json)
-if ($files.Count -lt 2 -or $files -notcontains 'ZhidaoAssistant.exe' -or
-    $files -notcontains 'install-files.json') { throw 'Invalid installer resource manifest.' }
-$seenNames = @{}
-$invalidNameChars = [System.IO.Path]::GetInvalidFileNameChars()
-foreach ($name in $files) {
-    if ($name -isnot [string]) { throw 'Invalid installer resource type.' }
-    if ([string]::IsNullOrWhiteSpace($name)) { throw 'Empty installer resource name.' }
-    if ($name -eq '.' -or $name -eq '..') { throw 'Invalid installer path.' }
-    if ($name.IndexOfAny($invalidNameChars) -ge 0) { throw 'Invalid installer path character.' }
-    if ($seenNames.ContainsKey($name)) { throw 'Duplicate installer resource name.' }
-    $seenNames[$name] = $true
-}
+# The manifest and every required resource were validated before any setup side effects.
+# Keep the same validated typed name list for staging and rollback below.
 # Validate every payload file before modifying the previous installation.
 # The Python/ZHS virtual environment and shared ~/.zhs user data are never staged/removed here.
 $stageDir = Join-Path $env:TEMP ('zhidao-app-stage-' + [Guid]::NewGuid().ToString('N'))
