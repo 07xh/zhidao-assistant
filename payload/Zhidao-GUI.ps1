@@ -200,21 +200,27 @@ function Import-CookiesFromTextDialog {
     $dialog.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterOwner
     $dialog.Owner = $script:window
     $dialog.FontFamily = New-Object System.Windows.Media.FontFamily('Microsoft YaHei UI')
+    $dialog.Background = Get-UiBrush 'UiBackground_FFFFFF'
+    $dialog.Foreground = Get-UiBrush 'UiForeground_203047'
     $stack = New-Object System.Windows.Controls.StackPanel
     $stack.Margin = New-Object System.Windows.Thickness(22)
     $info = New-Object System.Windows.Controls.TextBlock
     $info.Text = '直接粘贴本人知到站点的 Cookie 字符串（可带 Cookie: 前缀），或者 ZHS JSON 数组。内容会隐藏显示，仅在本机处理；不能保证所有浏览器 Cookie 都适用。'
     $info.TextWrapping = [System.Windows.TextWrapping]::Wrap
+    $info.Foreground = Get-UiBrush 'UiForeground_203047'
     $info.Margin = New-Object System.Windows.Thickness(0,0,0,12)
     $stack.Children.Add($info) | Out-Null
     $secret = New-Object System.Windows.Controls.PasswordBox
     $secret.MaxLength = 262144
     $secret.MinHeight = 48
+    $secret.Background = Get-UiBrush 'UiBackground_EDF3FC'
+    $secret.Foreground = Get-UiBrush 'UiForeground_203047'
     $secret.Margin = New-Object System.Windows.Thickness(0,0,0,12)
     $stack.Children.Add($secret) | Out-Null
     $notice = New-Object System.Windows.Controls.TextBlock
     $notice.Text = '登录前会二次核验服务器；失败时尝试恢复旧 Cookie。凭证仍按 ZHS 原格式保存为本机明文文件。请不要在聊天或 GitHub 粘贴 Cookie。'
     $notice.TextWrapping = [System.Windows.TextWrapping]::Wrap
+    $notice.Foreground = Get-UiBrush 'UiForeground_78869A'
     $notice.Margin = New-Object System.Windows.Thickness(0,0,0,12)
     $stack.Children.Add($notice) | Out-Null
     $actions = New-Object System.Windows.Controls.StackPanel
@@ -222,10 +228,14 @@ function Import-CookiesFromTextDialog {
     $actions.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Right
     $cancel = New-Object System.Windows.Controls.Button
     $cancel.Content = '取消'
+    $cancel.Background = Get-UiBrush 'UiBackground_E9F0FB'
+    $cancel.Foreground = Get-UiBrush 'UiForeground_2756A0'
     $cancel.Width = 90
     $cancel.Margin = New-Object System.Windows.Thickness(0,0,10,0)
     $confirm = New-Object System.Windows.Controls.Button
     $confirm.Content = '验证并登录'
+    $confirm.Background = Get-UiBrush 'UiBackground_326FE5'
+    $confirm.Foreground = [System.Windows.Media.Brushes]::White
     $confirm.Width = 112
     $confirm.IsDefault = $true
     $actions.Children.Add($cancel) | Out-Null
@@ -867,7 +877,7 @@ function Select-Course([int]$index) {
         if ($points.Count -eq 0) { [void](Add-Text $p '暂未返回可展示的知识点。' 13 '#7B879A') }
         foreach ($point in $points) {
             $row = New-Object System.Windows.Controls.Border
-            $row.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#F8FAFD')
+            $row.Background = Get-UiBrush 'UiBackground_F7FAFE'
             $row.CornerRadius = [System.Windows.CornerRadius]::new(10)
             $row.Margin = [System.Windows.Thickness]::new(0,0,0,9)
             $row.Padding = [System.Windows.Thickness]::new(13)
@@ -887,7 +897,7 @@ function Select-Course([int]$index) {
     if ($videos.Count -eq 0) { [void](Add-Text $p '此课程没有返回可展示的视频。' 13 '#7B879A') }
     foreach ($video in $videos) {
         $row = New-Object System.Windows.Controls.Border
-        $row.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#F8FAFD')
+        $row.Background = Get-UiBrush 'UiBackground_F7FAFE'
         $row.CornerRadius = [System.Windows.CornerRadius]::new(10)
         $row.Margin = [System.Windows.Thickness]::new(0,0,0,9)
         $row.Padding = [System.Windows.Thickness]::new(13)
