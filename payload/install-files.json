@@ -3,6 +3,8 @@
   "Zhidao-GUI.ps1",
   "SessionState.ps1",
   "CookieImport.ps1",
+  "HeartbeatMonitor.ps1",
+  "HeartbeatView.ps1",
   "Zhidao-UI.xaml",
   "Consent-UI.xaml",
   "Zhidao-Task.cmd",

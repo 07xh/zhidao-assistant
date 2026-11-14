@@ -13,6 +13,10 @@ $definitions = @($ast.FindAll({
 }, $true))
 if ($definitions.Count -ne $required.Count) { throw 'Missing or duplicate verification function' }
 foreach ($f in $definitions) { Invoke-Expression $f.Extent.Text }
+# Queue-PendingVerify now also records a strictly session-bound, read-only UI event.
+# Use the production state module instead of stubbing away its assertions.
+. (Join-Path $PSScriptRoot 'payload\HeartbeatMonitor.ps1')
+Initialize-HeartbeatMonitor
 $script:statusText = [pscustomobject]@{ Text = '' }
 function Control([string]$name) { return $script:statusText }
 

@@ -8,7 +8,8 @@ param(
     [ValidateSet('1','1.25','1.5','2')][string]$Speed = '1.5',
     [switch]$AllowMinimize,
     [switch]$AutoStart,
-    [switch]$AutoNext
+    [switch]$AutoNext,
+    [ValidatePattern('^[0-9a-f]{32}$')][string]$MonitorToken = ''
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework
@@ -16,6 +17,41 @@ Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
 $root = Join-Path $env:LOCALAPPDATA 'ZHSDesktop'
+
+# A short-lived sanitized local observation only. No account, URL, cookie or
+# server progress is written to this monitor file.
+$script:monitorStatusFile = if ($MonitorToken) { Join-Path $root ('monitor-playback-' + $MonitorToken + '.json') } else { '' }
+$script:monitorLastWritten = [DateTime]::MinValue
+function Write-OfficialPlaybackObservation([string]$eventName, [int]$position, [int]$duration, [bool]$pageVisible) {
+    if (-not $script:monitorStatusFile -or $eventName -notin @(
+        'observing','advancing','stalled','paused','buffering','seeking',
+        'position-jump','sampling-gap','visibility-changed','ended')) { return }
+    $now = [DateTime]::UtcNow
+    if (($now - $script:monitorLastWritten).TotalMilliseconds -lt 1500) { return }
+    if ($position -lt 0 -or $position -gt 864000 -or $duration -lt 0 -or $duration -gt 864000) { return }
+    $tmp = Join-Path $root ('monitor-write-' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    $bak = Join-Path $root ('monitor-old-' + [Guid]::NewGuid().ToString('N') + '.bak')
+    try {
+        $body = @{
+            v = 1; token = $MonitorToken; event = $eventName;
+            position = $position; duration = $duration;
+            visible = $pageVisible; at = $now.ToString('o')
+        } | ConvertTo-Json -Compress
+        [IO.File]::WriteAllText($tmp, $body, [Text.UTF8Encoding]::new($false))
+        if (Test-Path -LiteralPath $script:monitorStatusFile -PathType Leaf) {
+            [IO.File]::Replace($tmp, $script:monitorStatusFile, $bak, $true)
+        } else {
+            [IO.File]::Move($tmp, $script:monitorStatusFile)
+        }
+        $script:monitorLastWritten = $now
+    } catch {
+        # Optional UI observation must not interrupt real playback.
+    } finally {
+        foreach ($item in @($tmp,$bak)) {
+            if (Test-Path -LiteralPath $item) { Remove-Item -LiteralPath $item -Force -ErrorAction SilentlyContinue }
+        }
+    }
+}
 $sdk = Join-Path $root 'webview2'
 $runtimeDll = Join-Path $sdk 'runtimes\win-x64\native\WebView2Loader.dll'
 $coreDll = Join-Path $sdk 'Microsoft.Web.WebView2.Core.dll'
@@ -178,6 +214,7 @@ $web.Add_CoreWebView2InitializationCompleted({
                         'visibility-changed' { '页面前后台状态改变，已重新检查播放状态' }
                         'ended' { '本地视频已结束' }
                     }
+                    Write-OfficialPlaybackObservation $event $position $duration ([bool]$message.pageVisible)
                     $backgroundText = if ($message.pageVisible -eq $false) { ' · 当前窗口/页面不在前台' } else { '' }
                     $status.Text = ('本地播放诊断：'+$stateText+' · '+$elapsedText+' / '+$durationText+$backgroundText+'。服务器学习进度需单独核验。')
                     return
@@ -310,7 +347,12 @@ $window.Add_StateChanged({
         $status.Text = '已恢复播放器窗口。请检查画面是否仍在播放，之后核验服务器进度。'
     }
 })
-$window.Add_Closed({ try { $web.Dispose() } catch { } })
+$window.Add_Closed({
+    try { $web.Dispose() } catch { }
+    if ($script:monitorStatusFile) {
+        Remove-Item -LiteralPath $script:monitorStatusFile -Force -ErrorAction SilentlyContinue
+    }
+})
 try {
     # Setting Source initializes CoreWebView2 asynchronously, without waiting on the UI thread.
     $web.Source = [Uri]::new($portalUri)

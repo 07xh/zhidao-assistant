@@ -47,6 +47,9 @@ $script:pendingVerifySessionFingerprint = ''
 $script:pendingVerifyPath = Join-Path $script:root 'pending-verify.json'
 $script:verifyOutputPath = $null
 $script:verifyErrorPath = $null
+$script:verifyCourse = $null
+$script:verifySession = ''
+$script:playerMonitorToken = ''
 $script:loginProbeState = ''
 $script:loginProbeCookieDigest = ''
 $script:loginProbeCheckedAt = $null
@@ -128,6 +131,9 @@ function Any-TaskActive {
 # Session state is a separate, syntax-checked module loaded before task handlers.
 . (Join-Path $script:root 'SessionState.ps1')
 . (Join-Path $script:root 'CookieImport.ps1')
+. (Join-Path $script:root 'HeartbeatMonitor.ps1')
+. (Join-Path $script:root 'HeartbeatView.ps1')
+Initialize-HeartbeatMonitor
 
 function Test-CookieImportAllowed {
     if (Any-TaskActive -or $null -ne $script:activeTaskProcess -or $script:cookieImportActive) {
@@ -284,6 +290,7 @@ function Check-TaskExit {
     $finishedPlayCourse = $null
     $finishedPlayFingerprint = ''
     $importServerExitCode = $null
+    $code = -1
     try {
         $script:activeTaskProcess.Refresh()
         if (-not $script:activeTaskProcess.HasExited) { return }
@@ -365,6 +372,10 @@ function Check-TaskExit {
         }
     }
     if ($null -ne $finishedPlayCourse) {
+        $state = if ($code -eq 0) { 'ended' } else { 'error' }
+        $eventCode = if ($code -eq 0) { 'zhs-exit-ok' } else { 'zhs-exit-error' }
+        [void](Set-HeartbeatMonitorTask $finishedPlayCourse $finishedPlayFingerprint $state 'zhs-original')
+        [void](Add-HeartbeatMonitorEvent $finishedPlayCourse $finishedPlayFingerprint $eventCode)
         $previousStatus = [string](Control 'SyncMessageText').Text
         if (Queue-PendingVerify $finishedPlayCourse $finishedPlayFingerprint) {
             (Control 'SyncMessageText').Text = $previousStatus + ' 已为该课程排队服务器只读核验。'
@@ -427,6 +438,7 @@ function Queue-PendingVerify($course, [string]$sessionFingerprint) {
     $script:pendingVerifyCourse = $course
     $script:pendingVerifySessionFingerprint = $sessionFingerprint
     Save-PendingVerify
+    [void](Add-HeartbeatMonitorEvent $course $sessionFingerprint 'verify-queued')
     return $true
 }
 function Check-VerifyExit {
@@ -435,6 +447,7 @@ function Check-VerifyExit {
         $script:monitorProcess.Refresh()
         if (-not $script:monitorProcess.HasExited) { return }
     } catch { return }
+    $exitCode = -1
     try {
         $exitCode = [int]$script:monitorProcess.ExitCode
         $message = if ($exitCode -eq 0) { '服务器只读核验成功，已刷新本地记录。' } else { '服务器核验失败；旧进度保持不变。' }
@@ -448,6 +461,14 @@ function Check-VerifyExit {
     } catch {
         (Control 'SyncMessageText').Text = '服务器核验任务已结束，但状态读取失败；可手动核验。'
     } finally {
+        if ($null -ne $script:verifyCourse) {
+            $verifyState = if ($exitCode -eq 0) { 'ok' } else { 'error' }
+            $verifyEvent = if ($exitCode -eq 0) { 'verify-ok' } else { 'verify-error' }
+            [void](Set-HeartbeatMonitorVerify $script:verifyCourse $script:verifySession $verifyState)
+            [void](Add-HeartbeatMonitorEvent $script:verifyCourse $script:verifySession $verifyEvent)
+        }
+        $script:verifyCourse = $null
+        $script:verifySession = ''
         $script:monitorProcess = $null
         foreach ($f in @($script:verifyOutputPath, $script:verifyErrorPath)) {
             if ($f) { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
@@ -509,6 +530,8 @@ function Launch-Original-ZHS {
         $script:activeTaskAction = 'play-ai'
         $script:activeTaskCourse = $c
         $script:activeTaskSessionFingerprint = $launchFingerprint
+        [void](Set-HeartbeatMonitorTask $c $launchFingerprint 'running' 'zhs-original')
+        [void](Add-HeartbeatMonitorEvent $c $launchFingerprint 'zhs-start')
         (Control 'SyncMessageText').Text = 'ZHS 原版命令已启动。结束后将显示退出状态；这不代表服务器已确认学习进度。'
     } catch { Notice '无法启动 ZHS 原版 CLI。请确认安装完成。' }
 }
@@ -530,6 +553,7 @@ function Update-MonitorDisplay {
     (Control 'HeartbeatStatusText').Text = $info
     (Control 'BtnOpenLearning').Content = if ($script:playMode -eq 'zhs-original') { '运行 ZHS 原版' } else { '打开官方播放窗口' }
     (Control 'BtnMonitorToggle').Content = if ($null -ne $script:monitorCourse) { '停止定时核验' } else { '开启定时核验' }
+    Update-HeartbeatPanel
 }
 function Stop-Monitor {
     $script:monitorCourse = $null
@@ -560,6 +584,10 @@ function Launch-Verify([bool]$silent, $courseOverride = $null) {
         $proc = Start-Process -FilePath $script:python -ArgumentList $taskArgs -WorkingDirectory $env:USERPROFILE -WindowStyle Hidden -PassThru -RedirectStandardOutput $out -RedirectStandardError $err -ErrorAction Stop
         if ($null -eq $proc) { return $false }
         $script:monitorProcess = $proc
+        $script:verifyCourse = $course
+        $script:verifySession = Get-SessionFingerprint
+        [void](Set-HeartbeatMonitorVerify $course $script:verifySession 'running')
+        [void](Add-HeartbeatMonitorEvent $course $script:verifySession 'verify-start')
         $script:verifyOutputPath = $out
         $script:verifyErrorPath = $err
         (Control 'SyncMessageText').Text = if ($silent) { '正在核验服务器课程记录。' } else { '单课核验已启动，结束后显示成功或错误代码。' }
@@ -607,11 +635,16 @@ function Open-Official-Course {
     if ($script:allowMinimize) { $cliArgs += '-AllowMinimize' }
     if ($script:autoStart) { $cliArgs += '-AutoStart' }
     if ($script:autoNext) { $cliArgs += '-AutoNext' }
+    $monitorToken = [Guid]::NewGuid().ToString('N')
+    $cliArgs += @('-MonitorToken', $monitorToken)
     try {
         $script:playerProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList $cliArgs -WorkingDirectory $env:USERPROFILE -PassThru
         $script:playerCourse = $course
         $script:playerOpenedAt = Get-Date
         $script:playerSessionFingerprint = Get-SessionFingerprint
+        $script:playerMonitorToken = $monitorToken
+        [void](Set-HeartbeatMonitorTask $course $script:playerSessionFingerprint 'running' 'official')
+        [void](Add-HeartbeatMonitorEvent $course $script:playerSessionFingerprint 'player-start')
         (Control 'SyncMessageText').Text = '已启动官方课程门户窗口；请在网页内登录后进入选中课程。目标倍速 '+$speed+'×。真实学习记录由官方播放器负责，按需核验。'
     } catch { Notice '官方学习窗口启动失败，请检查 Install-WebView2.ps1 与安装结果。' }
 }
@@ -627,13 +660,23 @@ function Check-PlayerExit {
     } catch { return }
     $previousCourse = $script:playerCourse
     $previousFingerprint = $script:playerSessionFingerprint
+    $previousToken = $script:playerMonitorToken
     $exitCode = -1
     try { $exitCode = $script:playerProcess.ExitCode } catch { }
     $script:playerProcess = $null
     $script:playerCourse = $null
     $script:playerOpenedAt = $null
     $script:playerSessionFingerprint = ''
+    $script:playerMonitorToken = ''
+    if ($previousToken -match '^[0-9a-f]{32}$') {
+        $oldMonitorFile = Join-Path $script:root ('monitor-playback-' + $previousToken + '.json')
+        Remove-Item -LiteralPath $oldMonitorFile -Force -ErrorAction SilentlyContinue
+    }
     if ($null -eq $previousCourse) { return }
+    $playerState = if ($exitCode -in @(0,22)) { 'ended' } else { 'error' }
+    [void](Set-HeartbeatMonitorTask $previousCourse $previousFingerprint $playerState 'official')
+    $playerEvent = if ($exitCode -eq 22) { 'player-external' } else { 'player-close' }
+    [void](Add-HeartbeatMonitorEvent $previousCourse $previousFingerprint $playerEvent)
     if ($exitCode -eq 22) {
         (Control 'SyncMessageText').Text = '已改用系统浏览器观看：外部浏览器关闭时间未知。观看完成后请手动点击“核验此课进度”。'
         return
@@ -1067,13 +1110,14 @@ $modeSelector.Add_SelectionChanged({
 (Control 'BtnOpenLearning').Add_Click({ Start-Selected-Mode })
 (Control 'BtnVerifyOne').Add_Click({ Launch-Verify $false })
 (Control 'BtnMonitorToggle').Add_Click({ Toggle-Monitor })
+(Control 'BtnHeartbeatExpand').Add_Click({ Toggle-HeartbeatPanel })
 $script:monitorTimer = New-Object System.Windows.Threading.DispatcherTimer
 $script:monitorTimer.Interval = [TimeSpan]::FromSeconds(120)
 $script:monitorTimer.Add_Tick({ if ($null -ne $script:monitorCourse) { Launch-Verify $true } })
 $script:timer = New-Object System.Windows.Threading.DispatcherTimer
 $script:timer.Interval = [TimeSpan]::FromSeconds(3)
 $script:timer.Add_Tick({
-    try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
+    try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache; Update-HeartbeatPanel } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
 })
 $script:window.Add_Closing({
     param($sender, $eventArgs)
