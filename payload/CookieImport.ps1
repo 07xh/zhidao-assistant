@@ -70,6 +70,7 @@ function Convert-ZhidaoCookieText([string]$inputText) {
     $pairs = $trimmed.Split(';')
     if ($pairs.Count -lt 1 -or $pairs.Count -gt 250) { throw 'COOKIE_COUNT' }
     $items = New-Object 'System.Collections.Generic.List[object]'
+    $seenNames = @{}
     foreach ($segment in $pairs) {
         $part = $segment.Trim()
         $position = $part.IndexOf('=')
@@ -83,11 +84,15 @@ function Convert-ZhidaoCookieText([string]$inputText) {
         }
         # A pasted request header has no domain or path metadata. Restrict it
         # to the first-party Zhihuishu cookie scope; the server must verify login.
-        $items.Add([ordered]@{
-            name = $name; value = $value; domain = '.zhihuishu.com'; path = '/'
+        if ($seenNames.ContainsKey($name)) { throw 'DUPLICATE_COOKIE' }
+        $seenNames[$name] = $true
+        $items.Add([pscustomobject]@{
+            name = [string]$name; value = [string]$value; domain = '.zhihuishu.com'; path = '/'
         })
     }
-    return Convert-ZhidaoCookieJson (ConvertTo-Json -InputObject $items.ToArray() -Compress -Depth 4)
+    # The text fields are already validated; serialize them directly to avoid
+    # Windows PowerShell 5.1 treating a re-parsed property as a nonstring value.
+    return (ConvertTo-Json -InputObject $items.ToArray() -Compress -Depth 4)
 }
 
 function Begin-ZhidaoCookieImport([string]$JsonContent) {
