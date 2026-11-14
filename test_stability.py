@@ -41,7 +41,12 @@ assert 'Load-PendingVerify' in gui and 'Check-VerifyExit' in gui
 assert 'Get-FileHash -LiteralPath (Join-Path $stageDir $name)' in installer
 assert 'install-files.json' in installer
 assert 'AppLifecycle.ps1' in read('Uninstall.ps1')
-assert 'RemoveZhsData' in read('Uninstall.ps1') and 'cannot delete the shared .zhs folder' in read('Uninstall.ps1')
+uninstaller = read('Uninstall.ps1')
+assert 'RemoveZhsData' in uninstaller and 'DELETE SHARED ZHS DATA' in uninstaller
+assert 'Assert-ZhidaoOwnedRoot' in uninstaller and 'Assert-ZhidaoNoReparseTree' in uninstaller
+assert "Clear-ZhidaoInstallerTempResidue" in uninstaller
+assert "Remove-ZhidaoOldAppResidue" in installer
+assert "LegacyCleanup.ps1" in read('install-files.json')
 
 # Both WPF documents remain well-formed XML.
 for name in ('Zhidao-UI.xaml', 'Consent-UI.xaml'):

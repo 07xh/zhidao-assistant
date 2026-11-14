@@ -25,9 +25,12 @@ assert 'Wait-LauncherAvailable' not in installer
 assert 'Assert-LauncherAvailable' in installer
 assert "'install-files.json'" in installer
 assert 'Get-FileHash -LiteralPath $src -Algorithm SHA256' in installer
-assert "foreach ($oldName in @('ZHS-CLI.cmd','ZHS-GUI.ps1'))" in installer
+assert 'Remove-ZhidaoOldAppResidue -InstallRoot $root' in installer
+assert 'Clear-ZhidaoInstallerTempResidue -OlderThanDays 7' in installer
+assert 'LegacyCleanup.ps1' in installer
 assert "Remove-Item -LiteralPath $root -Recurse -Force" not in installer
 assert "Remove-Item -LiteralPath $root -Recurse -Force" in uninstaller
-assert 'if ($RemoveZhsData)' in uninstaller
+assert 'if ($RemoveZhsData -and $sharedPresent)' in uninstaller
+assert 'DELETE SHARED ZHS DATA' in uninstaller
 assert 'privacy-accepted-v5.2.7.flag' in (root / 'payload/Zhidao-GUI.ps1').read_text('utf-8-sig')
 print('Passed lifecycle safety/upgrade assertions (source contracts only).')
