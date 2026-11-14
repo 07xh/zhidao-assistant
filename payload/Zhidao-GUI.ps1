@@ -1,4 +1,4 @@
-﻿# 知到学习助手 V5.2.8 · 官方 WebView2 播放 + 双模式读取。
+﻿# 知到学习助手 V5.2.9 Beta 1 · 官方 WebView2 播放 + 双模式读取。
 # 保留 ZHS 0.1.5 的登录和 V3 的 zhidao_only.py 数据读取适配器。
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework
@@ -206,7 +206,7 @@ function Start-Task([string]$action) {
         } else {
             (Control 'SyncMessageText').Text = '正在同步服务器视频或知识点进度；读取失败时保留旧缓存。'
         }
-    } catch { Notice '无法启动任务。请检查安装是否完整，或重新运行 V5.2.8 安装程序。' }
+    } catch { Notice '无法启动任务。请检查安装是否完整，或重新运行 V5.2.9 安装程序。' }
 }
 function Check-TaskExit {
     if ($null -eq $script:activeTaskProcess) { return }
