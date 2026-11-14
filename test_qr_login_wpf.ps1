@@ -34,6 +34,19 @@ try {
     if ((Control 'QrLoginStateText').Text -notmatch '新二维码已生成') {
         throw 'Current fresh QR status was not displayed'
     }
+    # No real screen is required: a WPF-compatible mock holder verifies
+    # that a scanned QR is no longer referenced in the image control.
+    $script:qrViewer = [pscustomobject]@{IsVisible=$true}
+    $script:qrViewerImage = [pscustomobject]@{Source='SECRET_FAKE_QR_BITMAP'}
+    $script:qrViewerStatus = [pscustomobject]@{Text=''}
+    $script:qrViewerImageStamp = 123456
+    $state.stage = 'scanned'
+    [IO.File]::WriteAllText($file,($state | ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+    Update-ZhidaoQrView
+    if ($null -ne $script:qrViewerImage.Source -or $script:qrViewerImageStamp -ne 0) {
+        throw 'Scanned QR image was still retained by WPF'
+    }
+    $script:qrViewer = $null
     $state.stage = 'confirming'
     [IO.File]::WriteAllText($file,($state | ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
     Update-ZhidaoQrView
