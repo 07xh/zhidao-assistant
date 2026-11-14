@@ -124,7 +124,7 @@ function Clear-ZhidaoLegacyShortcuts {
         ),
         [switch]$IncludePrimaryShortcut
     )
-    $names = @('ZHS Desktop.lnk','知到助手.lnk','知到学习助手 Beta.lnk')
+    $names = @('ZHS Desktop.lnk','Zhidao Desktop.lnk','知到助手.lnk','知到学习助手 Beta.lnk')
     if ($IncludePrimaryShortcut) { $names += '知到学习助手.lnk' }
     $targets = @(
         (Join-Path $InstallRoot 'ZhidaoAssistant.exe'),
