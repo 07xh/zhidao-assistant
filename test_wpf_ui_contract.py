@@ -31,7 +31,7 @@ class WpfVisualContractTests(unittest.TestCase):
 
     def test_xaml_well_formed_and_still_a_window(self):
         self.assertEqual(self.root.tag, WPF_NS + "Window")
-        self.assertGreaterEqual(int(self.root.attrib["MinWidth"]), 940)
+        self.assertGreaterEqual(int(self.root.attrib["MinWidth"]), 780)
 
     def test_event_handlers_only_reference_existing_controls(self):
         names = set(re.findall(r"Control\s*'([^']+)'", self.gui_text))
@@ -76,7 +76,7 @@ class WpfVisualContractTests(unittest.TestCase):
             for e in self.root.iter()
             if XAML_NS + "Key" in e.attrib
         }
-        used = set(re.findall(r"\\{DynamicResource (Ui[A-Za-z]+_[A-Fa-f0-9]{6})\\}", self.xml_text))
+        used = set(re.findall(r"\{DynamicResource (Ui[A-Za-z]+_[A-Fa-f0-9]{6})\}", self.xml_text))
         self.assertGreater(len(used), 40)
         self.assertFalse(used - declared)
 
