@@ -149,10 +149,18 @@ def login_with_qr(config, session, observation: LoginObservation, data_dir: Path
     print("[QR_CONFIRMED] 手机端已确认，正在建立并核验 CAS 服务器会话。")
     # The original LoginManager returns after QR status==1; this by itself
     # does not guarantee the protected Zhidao APIs accept the cookie.
-    try:
-        status = verify_session(session)
-    except Exception:
-        status = SessionStatus.UNAVAILABLE
+    status = SessionStatus.UNAVAILABLE
+    # Authentication endpoint failures can be transient. Retry only read-only
+    # session checks, never the QR confirmation or one-time-password request.
+    for attempt in range(3):
+        try:
+            status = verify_session(session)
+        except Exception:
+            status = SessionStatus.UNAVAILABLE
+        if status != SessionStatus.UNAVAILABLE:
+            break
+        if attempt < 2:
+            time.sleep(1)
 
     if status == SessionStatus.EXPIRED:
         observation.record("rejected")
