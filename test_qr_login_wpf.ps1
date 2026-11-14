@@ -34,6 +34,54 @@ try {
     if ((Control 'QrLoginStateText').Text -notmatch '新二维码已生成') {
         throw 'Current fresh QR status was not displayed'
     }
+    # Verify actual WPF BitmapImage decoding, not just text labels. A synthetic
+    # local PNG stands in for an image produced by the upstream QR callback.
+    Add-Type -AssemblyName System.Drawing
+    $bitmap = [Drawing.Bitmap]::new(128,128)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.Clear([Drawing.Color]::White)
+        for ($y = 0; $y -lt 16; $y++) {
+            for ($x = 0; $x -lt 16; $x++) {
+                if ((($x+$y) % 2) -eq 0) {
+                    $graphics.FillRectangle([Drawing.Brushes]::Black, $x*8, $y*8, 8, 8)
+                }
+            }
+        }
+        $bitmap.Save($script:qrPath, [Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+    $script:qrViewer = [pscustomobject]@{IsVisible=$true}
+    $script:qrViewerImage = New-Object System.Windows.Controls.Image
+    $script:qrViewerStatus = [pscustomobject]@{Text=''}
+    Update-ZhidaoQrView
+    if ($null -eq $script:qrViewerImage.Source) {
+        throw ('Fresh real PNG failed WPF bitmap decode: ' + $script:qrViewerStatus.Text)
+    }
+    # Simulate a missing or delayed observation file: a current attempt's
+    # fresh QR can still render, without pretending authentication succeeded.
+    Remove-Item -LiteralPath $file -Force -ErrorAction Stop
+    $script:qrViewerImage.Source = $null
+    $script:qrViewerImageStamp = 0
+    Update-ZhidaoQrView
+    if ($null -eq $script:qrViewerImage.Source -or
+        (Control 'QrLoginStateText').Text -notmatch '状态同步延迟') {
+        throw 'Safe current QR fallback did not show the real PNG'
+    }
+    # A prior-login PNG must not render even if a pending state exists.
+    (Get-Item -LiteralPath $script:qrPath).LastWriteTimeUtc = [DateTime]::UtcNow.AddHours(-1)
+    $script:qrViewerImage.Source = $null
+    $script:qrViewerImageStamp = 0
+    Update-ZhidaoQrView
+    if ($null -ne $script:qrViewerImage.Source) {
+        throw 'Old QR PNG was rendered as a current login'
+    }
+    Remove-Item -LiteralPath $script:qrPath -Force -ErrorAction Stop
+    $state.stage = 'ready'
+    [IO.File]::WriteAllText($file,($state | ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+    $script:qrViewer = $null
     # No real screen is required: a WPF-compatible mock holder verifies
     # that a scanned QR is no longer referenced in the image control.
     $script:qrViewer = [pscustomobject]@{IsVisible=$true}
@@ -90,7 +138,7 @@ try {
     if (-not (Clear-ZhidaoQrImage $script:qrPath)) {
         throw 'Repeated QR cleanup must be idempotent'
     }
-    Write-Host 'QR login WPF lifecycle, exact image cleanup and token/time isolation passed.'
+    Write-Host 'QR real PNG decoding, delayed-state fallback, stale-image guard, lifecycle and cleanup passed.'
 } finally {
     Remove-Item -LiteralPath $script:root -Recurse -Force -ErrorAction SilentlyContinue
 }
