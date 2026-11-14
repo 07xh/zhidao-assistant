@@ -19,9 +19,9 @@ try {
                         'Zhidao-GUI.ps1')) {
         [IO.File]::WriteAllText((Join-Path $installRoot $name),'fixture')
     }
-    [IO.File]::WriteAllText((Join-Path $installRoot 'install-files.json'),@'
-["ZhidaoAssistant.exe","install-files.json","ZHS-GUI.ps1","ZHS-CLI.cmd","Zhidao-OldUI.ps1","Zhidao-MyNotes.txt","Zhidao-GUI.ps1"]
-'@,[Text.UTF8Encoding]::new($false))
+    $previousManifest = '["ZhidaoAssistant.exe","install-files.json","ZHS-GUI.ps1","ZHS-CLI.cmd","Zhidao-OldUI.ps1","Zhidao-MyNotes.txt","Zhidao-GUI.ps1"]'
+    [IO.File]::WriteAllText((Join-Path $installRoot 'install-files.json'),
+        $previousManifest,[Text.UTF8Encoding]::new($false))
     New-Item -ItemType Directory -Path (Join-Path $installRoot '.venv') -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $installRoot '.venv\user.txt'),'private runtime fixture')
     $live = @('ZhidaoAssistant.exe','Zhidao-GUI.ps1','install-files.json','LegacyCleanup.ps1')
