@@ -284,10 +284,13 @@ function Check-TaskExit {
     if ($script:cookieImportActive) {
         $importStatus = Complete-ZhidaoCookieImport $importServerExitCode
         if ($importStatus) {
-            $script:loginProbeState = ''
-            $script:loginProbeCookieDigest = ''
-            $script:loginProbeCheckedAt = $null
-            Update-LoginState
+            # Preserve the doctor result on success; only a rollback invalidates it.
+            if ($null -eq $importServerExitCode -or [int]$importServerExitCode -notin @(0, 6, 7)) {
+                $script:loginProbeState = ''
+                $script:loginProbeCookieDigest = ''
+                $script:loginProbeCheckedAt = $null
+                Update-LoginState
+            }
             (Control 'SyncMessageText').Text = $importStatus
         }
     }
@@ -1000,6 +1003,13 @@ $script:timer = New-Object System.Windows.Threading.DispatcherTimer
 $script:timer.Interval = [TimeSpan]::FromSeconds(3)
 $script:timer.Add_Tick({
     try { Check-TaskExit; Check-PlayerExit; Check-VerifyExit; Check-PendingVerify; Refresh-Cache } catch { (Control 'SyncMessageText').Text = '刷新界面失败；可尝试重新启动应用。' }
+})
+$script:window.Add_Closing({
+    param($sender, $eventArgs)
+    if ($script:cookieImportActive) {
+        $eventArgs.Cancel = $true
+        Notice 'Cookie 登录仍在服务器核验中。为保护原登录态，请先等待本次核验结果。'
+    }
 })
 $script:window.Add_Closed({ $script:timer.Stop(); $script:monitorTimer.Stop(); Save-PendingVerify })
 Refresh-Cache -Force
