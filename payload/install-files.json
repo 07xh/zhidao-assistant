@@ -4,6 +4,7 @@
   "SessionState.ps1",
   "CookieImport.ps1",
   "InstallerManifest.ps1",
+  "LegacyCleanup.ps1",
   "HeartbeatMonitor.ps1",
   "HeartbeatView.ps1",
   "Zhidao-UI.xaml",
