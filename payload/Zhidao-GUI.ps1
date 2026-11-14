@@ -20,6 +20,8 @@ $script:licensePath = Join-Path $script:root 'LICENSE-GPL-3.0.txt'
 $script:runningTasks = @()
 $script:activeTaskProcess = $null
 $script:activeTaskAction = ''
+$script:activeTaskCourse = $null
+$script:activeTaskSessionFingerprint = ''
 $script:courses = @()
 $script:progressCourses = @()
 $script:progressIncomplete = $false
@@ -156,11 +158,17 @@ function Start-Task([string]$action) {
 function Check-TaskExit {
     if ($null -eq $script:activeTaskProcess) { return }
     $autoCheckAfterLogin = $false
+    $finishedPlayCourse = $null
+    $finishedPlayFingerprint = ''
     try {
         $script:activeTaskProcess.Refresh()
         if (-not $script:activeTaskProcess.HasExited) { return }
         $code = [int]$script:activeTaskProcess.ExitCode
         $action = $script:activeTaskAction
+        if ($action -eq 'play-ai') {
+            $finishedPlayCourse = $script:activeTaskCourse
+            $finishedPlayFingerprint = $script:activeTaskSessionFingerprint
+        }
         if ($action -eq 'login') {
             $autoCheckAfterLogin = ($code -eq 0)
             (Control 'SyncMessageText').Text = if ($code -eq 0) {
@@ -214,7 +222,17 @@ function Check-TaskExit {
     } finally {
         $script:activeTaskProcess = $null
         $script:activeTaskAction = ''
+        $script:activeTaskCourse = $null
+        $script:activeTaskSessionFingerprint = ''
         $script:runningTasks = @()
+    }
+    if ($null -ne $finishedPlayCourse) {
+        $previousStatus = [string](Control 'SyncMessageText').Text
+        if (Queue-PendingVerify $finishedPlayCourse $finishedPlayFingerprint) {
+            (Control 'SyncMessageText').Text = $previousStatus + ' 已为该课程排队服务器只读核验。'
+        } else {
+            (Control 'SyncMessageText').Text = $previousStatus + ' 自动核验未排队（会话变化或已有待核验任务），请手动核验。'
+        }
     }
     if ($autoCheckAfterLogin) { Start-Task 'doctor' }
 }
@@ -332,6 +350,9 @@ function Launch-Original-ZHS {
         return
     }
     if (Any-TaskActive) { Notice '已有任务正在运行，请先完成或关闭该任务窗口。'; return }
+    if ($null -ne $script:pendingVerifyCourse) { Notice '已有等待核验的课程，请先完成服务器核验。'; return }
+    $launchFingerprint = Get-SessionFingerprint
+    if (-not $launchFingerprint) { Notice 'ZHS 登录会话尚未绑定到课程缓存，请先登录并同步课程。'; return }
     if ($null -ne $script:monitorCourse) { Stop-Monitor }
     $message = "这会调用未修改的 ZHS 0.1.5 原版 CLI，执行 AI 智慧课程的模拟播放与进度上报。`n`n" +
         "它不等于实际观看课程，原版还可能处理视频中的弹窗题目；可能在服务器端改变学习记录，也可能违反学校或平台的学习规定。`n" +
@@ -348,6 +369,8 @@ function Launch-Original-ZHS {
         $script:runningTasks = @($proc)
         $script:activeTaskProcess = $proc
         $script:activeTaskAction = 'play-ai'
+        $script:activeTaskCourse = $c
+        $script:activeTaskSessionFingerprint = $launchFingerprint
         (Control 'SyncMessageText').Text = 'ZHS 原版命令已启动。结束后将显示退出状态；这不代表服务器已确认学习进度。'
     } catch { Notice '无法启动 ZHS 原版 CLI。请确认安装完成。' }
 }
@@ -419,6 +442,7 @@ function Save-PlayerSettings {
 function Open-Official-Course {
     $course = Current-Course
     if ($null -eq $course) { Notice '请先选择一门课程。'; return }
+    if ($null -ne $script:pendingVerifyCourse) { Notice '已有等待核验的课程，请先完成服务器核验。'; return }
     $validated = Valid-CourseArgs $course
     if ($null -eq $validated) { Notice '课程 ID 尚未读取成功，请先同步课程。'; return }
     if ($null -ne $script:playerProcess) {
@@ -449,6 +473,7 @@ function Open-Official-Course {
         $script:playerProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList $cliArgs -WorkingDirectory $env:USERPROFILE -PassThru
         $script:playerCourse = $course
         $script:playerOpenedAt = Get-Date
+        $script:playerSessionFingerprint = Get-SessionFingerprint
         (Control 'SyncMessageText').Text = '已启动官方课程门户窗口；请在网页内登录后进入选中课程。目标倍速 '+$speed+'×。真实学习记录由官方播放器负责，按需核验。'
     } catch { Notice '官方学习窗口启动失败，请检查 Install-WebView2.ps1 与安装结果。' }
 }
@@ -463,23 +488,35 @@ function Check-PlayerExit {
         if (-not $script:playerProcess.HasExited) { return }
     } catch { return }
     $previousCourse = $script:playerCourse
+    $previousFingerprint = $script:playerSessionFingerprint
     $exitCode = -1
     try { $exitCode = $script:playerProcess.ExitCode } catch { }
     $script:playerProcess = $null
     $script:playerCourse = $null
     $script:playerOpenedAt = $null
+    $script:playerSessionFingerprint = ''
     if ($null -eq $previousCourse) { return }
     if ($exitCode -eq 22) {
         (Control 'SyncMessageText').Text = '已改用系统浏览器观看：外部浏览器关闭时间未知。观看完成后请手动点击“核验此课进度”。'
         return
     }
     # Do not discard short study sessions. Defer until existing read tasks exit.
-    $script:pendingVerifyCourse = $previousCourse
-    Save-PendingVerify
-    (Control 'SyncMessageText').Text = '播放窗口已关闭。服务器只读核验已排队，其他同步任务结束后自动执行。'
+    if (Queue-PendingVerify $previousCourse $previousFingerprint) {
+        (Control 'SyncMessageText').Text = '播放窗口已关闭。服务器只读核验已排队，其他同步任务结束后自动执行。'
+    } else {
+        (Control 'SyncMessageText').Text = '播放窗口已关闭，但自动核验未排队（ZHS 会话变化或已有待核验任务）。请手动核验。'
+    }
 }
 function Check-PendingVerify {
     if ($null -eq $script:pendingVerifyCourse) { return }
+    if (-not $script:pendingVerifySessionFingerprint -or
+        $script:pendingVerifySessionFingerprint -ne (Get-SessionFingerprint)) {
+        $script:pendingVerifyCourse = $null
+        $script:pendingVerifySessionFingerprint = ''
+        Remove-Item -LiteralPath $script:pendingVerifyPath -Force -ErrorAction SilentlyContinue
+        (Control 'SyncMessageText').Text = '登录会话发生变化，已取消旧课程自动核验；请在当前账号手动核验。'
+        return
+    }
     if (Any-TaskActive) { return }
     if ($null -ne $script:monitorProcess) {
         try {
@@ -490,6 +527,7 @@ function Check-PendingVerify {
     $target = $script:pendingVerifyCourse
     if (Launch-Verify $true $target) {
         $script:pendingVerifyCourse = $null
+        $script:pendingVerifySessionFingerprint = ''
         Remove-Item -LiteralPath $script:pendingVerifyPath -Force -ErrorAction SilentlyContinue
     }
 }
