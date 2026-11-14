@@ -23,6 +23,7 @@ if (Test-Path -LiteralPath $root -PathType Container) {
     . $lifecycle
     . $cleanup
     Stop-ZhidaoAppProcesses -InstallRoot $root
+    Assert-ZhidaoSafeUninstallTree -InstallRoot $root
     # Whole app-local directory: installed files, private .venv, uv runtime,
     # WebView2 profile, app cache and all historical app-version files.
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction Stop
