@@ -109,3 +109,9 @@ jobs:
       - name: Smoke test WPF monitor layout and progress binding with fake data
         shell: powershell
         run: .\\test_heartbeat_monitor_wpf.ps1
+      - name: Test appearance theme and responsive WPF layout
+        shell: powershell
+        run: .\\test_ui_appearance_wpf.ps1
+      - name: Smoke test dynamic course card status and theme
+        shell: powershell
+        run: .\\test_ui_course_cards_wpf.ps1

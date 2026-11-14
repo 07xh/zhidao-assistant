@@ -31,7 +31,7 @@ class WpfVisualContractTests(unittest.TestCase):
 
     def test_xaml_well_formed_and_still_a_window(self):
         self.assertEqual(self.root.tag, WPF_NS + "Window")
-        self.assertGreaterEqual(int(self.root.attrib["MinWidth"]), 940)
+        self.assertGreaterEqual(int(self.root.attrib["MinWidth"]), 640)
 
     def test_event_handlers_only_reference_existing_controls(self):
         names = set(re.findall(r"Control\s*'([^']+)'", self.gui_text))
@@ -59,6 +59,26 @@ class WpfVisualContractTests(unittest.TestCase):
                          self.named["HeartbeatLocalProgressBar"])
         self.assertIn("仅来自原版控制台", self.xml_text)
         self.assertIn("服务器", self.xml_text)
+
+    def test_adaptive_course_cards_and_login_controls(self):
+        self.assertEqual(self.named["HomeCourseCards"].tag, WPF_NS + "WrapPanel")
+        for name in ("LoginStateDot", "LoginGuideText", "BtnLoginShortcut",
+                     "BtnThemeToggle", "ThemeModeText", "SidebarBrandText"):
+            self.assertIn(name, self.named)
+        for filename in ("UiAppearance.ps1", "UiCourseCards.ps1"):
+            self.assertTrue((ROOT / "payload" / filename).is_file())
+        self.assertIn("Update-UiLayout", self.gui_text)
+        self.assertIn("Update-LoginPresentation", self.gui_text)
+
+    def test_all_dynamic_appearance_resources_resolve(self):
+        declared = {
+            e.attrib[XAML_NS + "Key"]
+            for e in self.root.iter()
+            if XAML_NS + "Key" in e.attrib
+        }
+        used = set(re.findall(r"\{DynamicResource (Ui[A-Za-z]+_[A-Fa-f0-9]{6})\}", self.xml_text))
+        self.assertGreater(len(used), 40)
+        self.assertFalse(used - declared)
 
     def test_buttons_and_cards_have_shared_styles(self):
         resources = {
