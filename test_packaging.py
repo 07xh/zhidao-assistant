@@ -30,9 +30,15 @@ class InstallerPackagingTests(unittest.TestCase):
         self.assertIn("ZhidaoAssistant.exe", names)
         self.assertIn("Patch-ZHS-0.1.5.py", names)
         install_script = (PAYLOAD / INSTALLER_SCRIPT).read_text("utf-8-sig")
-        self.assertIn("Get-Content -LiteralPath $manifestFile", install_script)
-        self.assertIn("ConvertFrom-Json", install_script)
-        self.assertNotIn("$files = @('ZhidaoAssistant.exe'", install_script)
+        self.assertIn(". (Join-Path $sourceDir 'InstallerManifest.ps1')", install_script)
+        self.assertIn("$files = Read-ZhidaoInstallerManifest $manifestFile", install_script)
+        self.assertNotIn("Get-Content -LiteralPath $manifestFile -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json", install_script)
+        # Manifest preflight happens before environment downloads or install mutations.
+        self.assertLess(install_script.index("$files = Read-ZhidaoInstallerManifest"),
+                        install_script.index("Stop-ZhidaoAppProcesses"))
+        self.assertLess(install_script.index("$files = Read-ZhidaoInstallerManifest"),
+                        install_script.index("if ($ready)"))
+        self.assertIn("InstallerManifest.ps1", names)
 
     def test_unlisted_payload_is_rejected_not_silently_published(self):
         with tempfile.TemporaryDirectory() as directory:
