@@ -53,6 +53,36 @@ try {
         try { $null = Read-ZhidaoCookieImport $source } catch { $rejected = $true }
         if (-not $rejected) { throw 'Untrusted cookie shape was accepted' }
     }
+    # Browser Cookie request header text is parsed locally, not sent to any new service.
+    $typed = Convert-ZhidaoCookieText 'Cookie: CASLOGC=fake%3Dvalue; other=fake=='
+    $parsed = @(ConvertFrom-Json -InputObject $typed)
+    if ($parsed.Count -ne 2 -or $parsed[0].name -ne 'CASLOGC' -or
+        $parsed[0].value -ne 'fake%3Dvalue' -or $parsed[1].value -ne 'fake==' -or
+        $parsed[0].domain -ne '.zhihuishu.com') {
+        throw 'Direct input parse failed'
+    }
+    $typedJson = Convert-ZhidaoCookieText $candidate
+    if ($typedJson -ne $normalized) { throw 'Direct ZHS JSON paste differs from file import' }
+
+    foreach ($badText in @(
+        'Cookie: CASLOGC=fake; CASLOGC=second',
+        'Cookie: CASLOGC',
+        'Cookie: a=b;; c=d',
+        "Cookie: a=b`r`nX-Header: injected",
+        'Cookie: =empty',
+        'Cookie: good=ok;badname',
+        ''
+    )) {
+        $rejected = $false
+        try { $null = Convert-ZhidaoCookieText $badText } catch { $rejected = $true }
+        if (-not $rejected) { throw 'Invalid direct input accepted' }
+    }
+    # The text import uses exactly the same transaction and rollback as file import.
+    Begin-ZhidaoCookieImport $typed
+    $rollbackMessage = Complete-ZhidaoCookieImport 4
+    if ([IO.File]::ReadAllText($script:cookiePath) -ne $normalized -or
+        $rollbackMessage -notmatch '恢复') { throw 'Direct input did not roll back' }
+    Write-Host 'Direct Cookie input parsing and rollback passed (synthetic values).'
     Write-Host 'Cookie import parsing, account scope, rollback and verified commit passed.'
 } finally {
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
