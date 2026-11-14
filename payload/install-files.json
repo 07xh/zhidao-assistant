@@ -2,6 +2,7 @@
   "ZhidaoAssistant.exe",
   "Zhidao-GUI.ps1",
   "SessionState.ps1",
+  "UiAppearance.ps1",
   "CookieImport.ps1",
   "QrLoginView.ps1",
   "InstallerManifest.ps1",
