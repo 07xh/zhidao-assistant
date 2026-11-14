@@ -68,53 +68,7 @@ function Remove-ZhidaoOldAppResidue {
         if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
         $name = $item.Name
         $orphan = (
-            $name -cmatch '^monitor-(zhs|playback|qr)-[0-9a-f]{32}\.json -or
-            $name -cmatch '^monitor-(write|old)-[0-9a-f]{32}\.(tmp|bak)$' -or
-            $name -ceq 'pending-verify.json.tmp'
-        )
-        if (-not $orphan -or $item.LastWriteTimeUtc -gt [DateTime]::UtcNow.AddDays(-2)) { continue }
-        Remove-Item -LiteralPath $item.FullName -Force -ErrorAction Stop
-        $count++
-    }
-    return $count
-}
-
-function Clear-ZhidaoInstallerTempResidue {
-    param([string]$TempRoot = $env:TEMP, [int]$OlderThanDays = 7)
-    if ($OlderThanDays -lt 1 -or $OlderThanDays -gt 365) {
-        throw 'Invalid installer temporary-file retention threshold.'
-    }
-    if ([string]::IsNullOrWhiteSpace($TempRoot) -or
-        -not (Test-Path -LiteralPath $TempRoot -PathType Container)) { return 0 }
-    # Exact direct children of TEMP only; do not traverse other user folders.
-    $base = [IO.Path]::GetFullPath($TempRoot).TrimEnd('\','/')
-    $cutoff = [DateTime]::UtcNow.AddDays(-$OlderThanDays)
-    $removed = 0
-    foreach ($item in @(Get-ChildItem -LiteralPath $base -Force -ErrorAction Stop)) {
-        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
-        if ($item.LastWriteTimeUtc -gt $cutoff) { continue }
-        $name = $item.Name
-        $valid = (
-            $name -cmatch '^zhidao-(setup|app-stage|app-backup)-[A-Za-z0-9-]{6,}$' -or
-            $name -cmatch '^zhidao-uv-[0-9a-f]{32}(\.whl)?$' -or
-            $name -cmatch '^zhidao-installer-build-[A-Za-z0-9_-]{6,}$'
-        )
-        if (-not $valid) { continue }
-        try {
-            if ($item.PSIsContainer) {
-                Assert-ZhidaoNoReparseTree -Directory $item.FullName
-                Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction Stop
-            } else {
-                Remove-Item -LiteralPath $item.FullName -Force -ErrorAction Stop
-            }
-            $removed++
-        } catch {
-            Write-Warning ('Could not safely remove old setup residue ' + $name + ': ' + $_.Exception.Message)
-        }
-    }
-    return $removed
-}
- -or
+            $name -cmatch '^monitor-(zhs|playback|qr)-[0-9a-f]{32}\.json$' -or
             $name -cmatch '^monitor-(write|old)-[0-9a-f]{32}\.(tmp|bak)$' -or
             $name -ceq 'pending-verify.json.tmp'
         )
