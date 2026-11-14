@@ -57,9 +57,10 @@ function Begin-ZhidaoCookieImport([string]$JsonContent) {
     $previousExists = Test-Path -LiteralPath $script:cookiePath -PathType Leaf
     $previousBytes = if ($previousExists) { [System.IO.File]::ReadAllBytes($script:cookiePath) } else { $null }
     $tempPath = Join-Path $script:dataDir ('cookies-import-' + [guid]::NewGuid().ToString('N') + '.tmp')
+    $backupPath = Join-Path $script:dataDir ('cookies-previous-' + [guid]::NewGuid().ToString('N') + '.bak')
     try {
         [System.IO.File]::WriteAllText($tempPath, $JsonContent, [System.Text.UTF8Encoding]::new($false))
-        if ($previousExists) { [System.IO.File]::Replace($tempPath, $script:cookiePath, $null, $true) }
+        if ($previousExists) { [System.IO.File]::Replace($tempPath, $script:cookiePath, $backupPath, $true) }
         else { [System.IO.File]::Move($tempPath, $script:cookiePath) }
         $script:cookieImportPreviousExists = $previousExists
         $script:cookieImportPreviousBytes = $previousBytes
@@ -67,6 +68,7 @@ function Begin-ZhidaoCookieImport([string]$JsonContent) {
         $script:cookieImportActive = $true
     } finally {
         if (Test-Path -LiteralPath $tempPath) { Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $backupPath) { Remove-Item -LiteralPath $backupPath -Force -ErrorAction SilentlyContinue }
     }
 }
 
@@ -82,10 +84,11 @@ function Complete-ZhidaoCookieImport($ServerExitCode) {
             return 'Cookie 校验未完成，且会话已被其他操作修改；未覆盖新会话，请手动检查登录。'
         }
         $tempPath = Join-Path $script:dataDir ('cookies-restore-' + [guid]::NewGuid().ToString('N') + '.tmp')
+        $backupPath = Join-Path $script:dataDir ('cookies-discard-' + [guid]::NewGuid().ToString('N') + '.bak')
         try {
             if ($script:cookieImportPreviousExists) {
                 [System.IO.File]::WriteAllBytes($tempPath, [byte[]]$script:cookieImportPreviousBytes)
-                [System.IO.File]::Replace($tempPath, $script:cookiePath, $null, $true)
+                [System.IO.File]::Replace($tempPath, $script:cookiePath, $backupPath, $true)
             } else {
                 Remove-Item -LiteralPath $script:cookiePath -Force -ErrorAction Stop
             }
@@ -94,6 +97,7 @@ function Complete-ZhidaoCookieImport($ServerExitCode) {
             return 'Cookie 导入未获服务器确认，回滚也失败；请使用设置页连接诊断，不要继续操作课程。'
         } finally {
             if (Test-Path -LiteralPath $tempPath) { Remove-Item -LiteralPath $tempPath -Force -ErrorAction SilentlyContinue }
+            if (Test-Path -LiteralPath $backupPath) { Remove-Item -LiteralPath $backupPath -Force -ErrorAction SilentlyContinue }
         }
     } finally {
         $script:cookieImportActive = $false
