@@ -45,7 +45,7 @@
       <!-- Detail view -->
       <Grid x:Name="PageDetail" Grid.Row="1" Visibility="Collapsed" Margin="28,26,28,20"><Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Border Style="{StaticResource CardStyle}" Padding="0"><DockPanel><TextBlock Text="选择课程" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="18,18,18,10"/><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="CourseListPanel" Margin="10,0,10,10"/></ScrollViewer></DockPanel></Border>
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock x:Name="DetailTitleText" Text="选择左侧课程查看学习项目" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="DetailMetaText" Text="只展示上次成功同步的服务器学习记录" Grid.Row="1" Foreground="#718096" FontSize="12" Margin="0,8,0,16" TextWrapping="Wrap"/><StackPanel Grid.Row="2" Margin="0,0,0,14">
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock x:Name="DetailTitleText" Text="选择左侧课程查看学习项目" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="DetailMetaText" Text="只展示上次成功同步的服务器学习记录" Grid.Row="1" Foreground="#718096" FontSize="12" Margin="0,8,0,16" TextWrapping="Wrap"/><StackPanel Grid.Row="2" Margin="0,0,0,14">
           <TextBlock Text="播放 / 心跳模式" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,7"/>
           <ComboBox x:Name="PlaybackModeSelector" Width="290" Height="34" HorizontalAlignment="Left" Margin="0,0,0,10" SelectedIndex="0">
             <ComboBoxItem Content="官方网页 · 真实观看心跳"/>
@@ -71,7 +71,43 @@
             <Button x:Name="BtnMonitorToggle" Style="{StaticResource SecondaryButton}" Content="开启定时核验" Margin="0"/>
           </WrapPanel>
           <TextBlock x:Name="HeartbeatStatusText" Text="官方 WebView2 真实播放；1.5×仅在网页播放器允许时生效；最小化可能受到浏览器后台播放限制。" Foreground="#718096" FontSize="11" TextWrapping="Wrap"/>
-        </StackPanel><ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="VideoListPanel"/></ScrollViewer></Grid></Border>
+        </StackPanel>
+          <!-- Status visualization only: no network requests or synthetic heartbeat control. -->
+          <Border Grid.Row="3" Background="#F4F8FF" BorderBrush="#DFE8F6" BorderThickness="1" CornerRadius="12" Padding="12" Margin="0,3,0,12">
+            <StackPanel>
+              <Grid Margin="0,0,0,9">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="学习状态监控" FontSize="14" FontWeight="SemiBold" Foreground="#1B3453"/>
+                  <TextBlock Text="本地运行、通信状态和服务器记录分开显示" FontSize="10" Foreground="#6A7C92" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button x:Name="BtnHeartbeatExpand" Grid.Column="1" Content="展开运行记录" FontSize="11" Padding="9,5" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}"/>
+              </Grid>
+              <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0"><TextBlock Text="任务进程" FontSize="10" Foreground="#6F8097"/><TextBlock x:Name="HeartbeatTaskLabel" Text="未启动" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
+                <StackPanel Grid.Column="1"><TextBlock Text="通信状态" FontSize="10" Foreground="#6F8097"/><TextBlock x:Name="HeartbeatCommsLabel" Text="未观测" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="服务器核验" FontSize="10" Foreground="#6F8097"/><TextBlock x:Name="HeartbeatVerifyLabel" Text="未核验" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/></StackPanel>
+              </Grid>
+              <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock Text="服务器上次记录" Foreground="#344E6E" FontSize="11" FontWeight="SemiBold"/>
+                <TextBlock x:Name="HeartbeatProgressLabel" Grid.Column="1" Text="—" Foreground="#2566B2" FontSize="11" FontWeight="SemiBold"/>
+              </Grid>
+              <ProgressBar x:Name="HeartbeatServerProgressBar" Height="7" Minimum="0" Maximum="100" Value="0" Foreground="#246BC8" Background="#E3EAF3"/>
+              <TextBlock x:Name="HeartbeatProgressHint" Text="没有可确认的服务器进度" FontSize="10" Foreground="#6A7C92" Margin="0,5,0,0" TextWrapping="Wrap"/>
+              <StackPanel x:Name="HeartbeatExpandedPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                <TextBlock Text="官方播放器 · 本地位置（非学习完成进度）" FontSize="11" FontWeight="SemiBold" Foreground="#344E6E" Margin="0,0,0,5"/>
+                <TextBlock x:Name="HeartbeatLocalPlaybackText" Text="暂无本地 HTML5 播放观测" Foreground="#687B90" FontSize="11" TextWrapping="Wrap"/>
+                <ProgressBar x:Name="HeartbeatLocalProgressBar" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#7795B7" Background="#E3EAF3" Margin="0,6,0,12"/>
+                <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                  <TextBlock Text="运行事件 · 当前课程" FontSize="11" FontWeight="SemiBold" Foreground="#344E6E"/>
+                  <TextBlock Text="只显示脱敏状态" Grid.Column="1" Foreground="#7A899A" FontSize="10"/>
+                </Grid>
+                <StackPanel x:Name="HeartbeatEventsPanel"/>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto"><StackPanel x:Name="VideoListPanel"/></ScrollViewer></Grid></Border>
       </Grid>
       <!-- Settings view -->
       <ScrollViewer x:Name="PageSettings" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><StackPanel Margin="28,26,28,28"><TextBlock Text="账号与隐私" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
